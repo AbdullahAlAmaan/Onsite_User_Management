@@ -14,7 +14,7 @@ class ImportService:
     
     @staticmethod
     def parse_excel(file_path: str) -> List[Dict]:
-        """Parse Excel file and return list of enrollment records."""
+        """Parse Excel file and return list of enrollment records (for interest submissions)."""
         try:
             df = pd.read_excel(file_path)
             # Normalize column names (handle variations)
@@ -26,10 +26,8 @@ class ImportService:
                     'employee_id': str(row.get('employee_id', '')).strip(),
                     'name': str(row.get('name', '')).strip(),
                     'email': str(row.get('email', '')).strip(),
-                    'sbu': str(row.get('sbu', '')).strip(),
-                    'designation': str(row.get('designation', '')).strip(),
-                    'course_name': str(row.get('course_name', '')).strip(),
-                    'batch_code': str(row.get('batch_code', '')).strip(),
+                    'sbu': str(row.get('sbu', '')).strip() if pd.notna(row.get('sbu')) else '',
+                    'designation': str(row.get('designation', '')).strip() if pd.notna(row.get('designation')) else '',
                 }
                 records.append(record)
             
@@ -39,7 +37,7 @@ class ImportService:
     
     @staticmethod
     def parse_csv(file_path: str) -> List[Dict]:
-        """Parse CSV file and return list of enrollment records."""
+        """Parse CSV file and return list of enrollment records (for interest submissions)."""
         try:
             df = pd.read_csv(file_path)
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
@@ -50,10 +48,8 @@ class ImportService:
                     'employee_id': str(row.get('employee_id', '')).strip(),
                     'name': str(row.get('name', '')).strip(),
                     'email': str(row.get('email', '')).strip(),
-                    'sbu': str(row.get('sbu', '')).strip(),
-                    'designation': str(row.get('designation', '')).strip(),
-                    'course_name': str(row.get('course_name', '')).strip(),
-                    'batch_code': str(row.get('batch_code', '')).strip(),
+                    'sbu': str(row.get('sbu', '')).strip() if pd.notna(row.get('sbu')) else '',
+                    'designation': str(row.get('designation', '')).strip() if pd.notna(row.get('designation')) else '',
                 }
                 records.append(record)
             
@@ -100,32 +96,59 @@ class ImportService:
         return db.query(Course).filter(Course.batch_code == batch_code).first()
     
     @staticmethod
-    def process_incoming_enrollments(db: Session, records: List[Dict]) -> Dict:
+    def find_student_by_employee_id_or_email(db: Session, employee_id: str, email: str) -> Optional[Student]:
+        """Find existing student by employee_id or email."""
+        student = db.query(Student).filter(Student.employee_id == employee_id).first()
+        if not student:
+            student = db.query(Student).filter(Student.email == email).first()
+        return student
+    
+    @staticmethod
+    def process_incoming_enrollments(db: Session, records: List[Dict], course_id: int) -> Dict:
         """
-        Process incoming enrollment records:
+        Process incoming enrollment records for a specific course:
         1. Store in incoming_enrollments table
-        2. Create/update students
+        2. Find existing students (by employee_id or email) - don't create new ones
         3. Run eligibility checks
         4. Create enrollment records
         """
+        # Get the course
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise ValueError(f"Course with ID {course_id} not found")
+        
         results = {
             'total': len(records),
             'processed': 0,
             'errors': [],
             'eligible': 0,
-            'ineligible': 0
+            'ineligible': 0,
+            'not_found': 0
         }
         
         for record in records:
             try:
                 # Validate required fields
-                if not all([record.get('employee_id'), record.get('name'), 
-                           record.get('email'), record.get('course_name'), 
-                           record.get('batch_code')]):
+                if not all([record.get('employee_id'), record.get('name'), record.get('email')]):
                     results['errors'].append({
                         'record': record,
-                        'error': 'Missing required fields'
+                        'error': 'Missing required fields (employee_id, name, email)'
                     })
+                    continue
+                
+                # Find existing student (don't create new ones)
+                student = ImportService.find_student_by_employee_id_or_email(
+                    db, 
+                    record['employee_id'],
+                    record['email']
+                )
+                
+                if not student:
+                    results['errors'].append({
+                        'record': record,
+                        'error': f"Employee not found in database (employee_id: {record['employee_id']}, email: {record['email']})"
+                    })
+                    results['not_found'] += 1
                     continue
                 
                 # Store in incoming_enrollments
@@ -135,29 +158,23 @@ class ImportService:
                     email=record['email'],
                     sbu=record.get('sbu'),
                     designation=record.get('designation'),
-                    course_name=record['course_name'],
-                    batch_code=record['batch_code'],
+                    course_name=course.name,
+                    batch_code=course.batch_code,
                     raw_data=json.dumps(record)
                 )
                 db.add(incoming)
                 db.flush()
                 
-                # Get or create student
-                student = ImportService.create_or_get_student(
-                    db, 
-                    record['employee_id'],
-                    record['name'],
-                    record['email'],
-                    record.get('sbu', 'OTHER'),
-                    record.get('designation')
-                )
+                # Check if enrollment already exists
+                existing_enrollment = db.query(Enrollment).filter(
+                    Enrollment.student_id == student.id,
+                    Enrollment.course_id == course.id
+                ).first()
                 
-                # Get course
-                course = ImportService.get_course_by_batch_code(db, record['batch_code'])
-                if not course:
+                if existing_enrollment:
                     results['errors'].append({
                         'record': record,
-                        'error': f"Course with batch code '{record['batch_code']}' not found"
+                        'error': f"Enrollment already exists for {student.name} in {course.name}"
                     })
                     incoming.processed = True
                     incoming.processed_at = datetime.utcnow()

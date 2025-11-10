@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 import os
@@ -14,6 +14,7 @@ router = APIRouter()
 @router.post("/excel")
 async def upload_excel(
     file: UploadFile = File(...),
+    course_id: int = Query(..., description="ID of the course to enroll students in"),
     db: Session = Depends(get_db)
 ):
     """Upload and process Excel file with enrollment data."""
@@ -40,7 +41,7 @@ async def upload_excel(
     try:
         # Parse and process
         records = ImportService.parse_excel(file_path)
-        results = ImportService.process_incoming_enrollments(db, records)
+        results = ImportService.process_incoming_enrollments(db, records, course_id)
         
         return {
             "message": "File processed successfully",
@@ -57,6 +58,7 @@ async def upload_excel(
 @router.post("/csv")
 async def upload_csv(
     file: UploadFile = File(...),
+    course_id: int = Query(..., description="ID of the course to enroll students in"),
     db: Session = Depends(get_db)
 ):
     """Upload and process CSV file with enrollment data."""
@@ -80,7 +82,7 @@ async def upload_csv(
     
     try:
         records = ImportService.parse_csv(file_path)
-        results = ImportService.process_incoming_enrollments(db, records)
+        results = ImportService.process_incoming_enrollments(db, records, course_id)
         
         return {
             "message": "File processed successfully",

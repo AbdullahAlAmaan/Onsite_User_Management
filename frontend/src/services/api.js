@@ -59,6 +59,7 @@ export const enrollmentsAPI = {
   getById: (id) => api.get(`/enrollments/${id}`),
   approve: (data, approvedBy) => api.post('/enrollments/approve', data, { params: { approved_by: approvedBy } }),
   bulkApprove: (data, approvedBy) => api.post('/enrollments/approve/bulk', data, { params: { approved_by: approvedBy } }),
+  withdraw: (id, reason, withdrawnBy) => api.post(`/enrollments/${id}/withdraw`, null, { params: { withdrawal_reason: reason, withdrawn_by: withdrawnBy } }),
 };
 
 export const coursesAPI = {
@@ -78,17 +79,17 @@ export const studentsAPI = {
 };
 
 export const importsAPI = {
-  uploadExcel: (file) => {
+  uploadExcel: (file, courseId) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/imports/excel', formData, {
+    return api.post(`/imports/excel?course_id=${courseId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  uploadCSV: (file) => {
+  uploadCSV: (file, courseId) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/imports/csv', formData, {
+    return api.post(`/imports/csv?course_id=${courseId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

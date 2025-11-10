@@ -21,8 +21,9 @@ import {
   Collapse,
   Card,
   CardContent,
+  Alert,
 } from '@mui/material';
-import { Add, Edit, Archive, ExpandMore, ExpandLess } from '@mui/icons-material';
+import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -35,6 +36,10 @@ function Courses() {
   const [expandedCourse, setExpandedCourse] = useState(null);
   const [courseEnrollments, setCourseEnrollments] = useState({});
   const [loadingEnrollments, setLoadingEnrollments] = useState({});
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [selectedEnrollment, setSelectedEnrollment] = useState(null);
+  const [withdrawalReason, setWithdrawalReason] = useState('');
+  const [message, setMessage] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     batch_code: '',
@@ -124,6 +129,44 @@ function Courses() {
     }
   };
 
+  const handleWithdraw = (enrollment) => {
+    setSelectedEnrollment(enrollment);
+    setWithdrawalReason('');
+    setWithdrawDialogOpen(true);
+  };
+
+  const handleWithdrawConfirm = async () => {
+    if (!withdrawalReason.trim()) {
+      setMessage({ type: 'error', text: 'Please provide a reason for withdrawal' });
+      return;
+    }
+
+    try {
+      await enrollmentsAPI.withdraw(selectedEnrollment.id, withdrawalReason, 'Admin');
+      setMessage({ type: 'success', text: 'Student withdrawn successfully' });
+      setWithdrawDialogOpen(false);
+      setSelectedEnrollment(null);
+      setWithdrawalReason('');
+      
+      // Refresh enrollments for the course
+      if (expandedCourse) {
+        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
+        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
+      }
+      
+      // Refresh courses to update seat counts
+      fetchCourses();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error withdrawing student' });
+    }
+  };
+
+  const handleWithdrawCancel = () => {
+    setWithdrawDialogOpen(false);
+    setSelectedEnrollment(null);
+    setWithdrawalReason('');
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -132,6 +175,12 @@ function Courses() {
           New Course
         </Button>
       </Box>
+
+      {message && (
+        <Alert severity={message.type} sx={{ mb: 2 }} onClose={() => setMessage(null)}>
+          {message.text}
+        </Alert>
+      )}
 
       {loading ? (
         <Box display="flex" justifyContent="center" p={3}>
@@ -206,6 +255,7 @@ function Courses() {
                                     <TableCell>Approval Status</TableCell>
                                     <TableCell>Completion Status</TableCell>
                                     <TableCell>Score</TableCell>
+                                    <TableCell>Actions</TableCell>
                                   </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -228,13 +278,26 @@ function Courses() {
                                           label={enrollment.approval_status}
                                           color={
                                             enrollment.approval_status === 'Approved' ? 'success' :
-                                            enrollment.approval_status === 'Pending' ? 'warning' : 'error'
+                                            enrollment.approval_status === 'Pending' ? 'warning' :
+                                            enrollment.approval_status === 'Withdrawn' ? 'error' : 'default'
                                           }
                                           size="small"
                                         />
                                       </TableCell>
                                       <TableCell>{enrollment.completion_status}</TableCell>
                                       <TableCell>{enrollment.score || '-'}</TableCell>
+                                      <TableCell>
+                                        {enrollment.approval_status === 'Approved' && (
+                                          <IconButton
+                                            size="small"
+                                            color="error"
+                                            onClick={() => handleWithdraw(enrollment)}
+                                            title="Withdraw Student"
+                                          >
+                                            <PersonRemove />
+                                          </IconButton>
+                                        )}
+                                      </TableCell>
                                     </TableRow>
                                   ))}
                                 </TableBody>
@@ -310,6 +373,40 @@ function Courses() {
           <Button onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained">
             Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Withdraw Dialog */}
+      <Dialog open={withdrawDialogOpen} onClose={handleWithdrawCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Withdraw Student from Course</DialogTitle>
+        <DialogContent>
+          {selectedEnrollment && (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="body1" gutterBottom>
+                <strong>Student:</strong> {selectedEnrollment.student_name}
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                <strong>Course:</strong> {selectedEnrollment.course_name} - {selectedEnrollment.batch_code}
+              </Typography>
+              <TextField
+                label="Reason for Withdrawal"
+                multiline
+                rows={4}
+                fullWidth
+                value={withdrawalReason}
+                onChange={(e) => setWithdrawalReason(e.target.value)}
+                placeholder="e.g., Misbehavior, Violation of code of conduct, etc."
+                sx={{ mt: 2 }}
+                required
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleWithdrawCancel}>Cancel</Button>
+          <Button onClick={handleWithdrawConfirm} color="error" variant="contained">
+            Withdraw
           </Button>
         </DialogActions>
       </Dialog>

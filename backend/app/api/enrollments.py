@@ -188,6 +188,55 @@ def bulk_approve_enrollments(
     db.commit()
     return results
 
+@router.post("/{enrollment_id}/withdraw", response_model=EnrollmentResponse)
+def withdraw_enrollment(
+    enrollment_id: int,
+    withdrawal_reason: str = Query(..., description="Reason for withdrawal"),
+    withdrawn_by: str = Query(..., description="Admin name"),
+    db: Session = Depends(get_db)
+):
+    """Withdraw a student from a course (e.g., for misbehavior)."""
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    
+    # Check if already withdrawn
+    if enrollment.approval_status == ApprovalStatus.WITHDRAWN:
+        raise HTTPException(status_code=400, detail="Enrollment already withdrawn")
+    
+    # Only allow withdrawal if approved (enrolled)
+    if enrollment.approval_status != ApprovalStatus.APPROVED:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot withdraw enrollment with status: {enrollment.approval_status}"
+        )
+    
+    # Update enrollment status
+    enrollment.approval_status = ApprovalStatus.WITHDRAWN
+    enrollment.rejection_reason = withdrawal_reason
+    enrollment.approved_by = withdrawn_by  # Store who withdrew
+    enrollment.approved_at = datetime.utcnow()
+    
+    # Free up the seat
+    course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+    if course.current_enrolled > 0:
+        course.current_enrolled -= 1
+    
+    db.commit()
+    db.refresh(enrollment)
+    
+    enrollment_dict = EnrollmentResponse.from_orm(enrollment).dict()
+    enrollment_dict['student_name'] = enrollment.student.name
+    enrollment_dict['student_email'] = enrollment.student.email
+    enrollment_dict['student_sbu'] = enrollment.student.sbu.value
+    enrollment_dict['student_employee_id'] = enrollment.student.employee_id
+    enrollment_dict['student_designation'] = enrollment.student.designation
+    enrollment_dict['student_experience_years'] = enrollment.student.experience_years
+    enrollment_dict['course_name'] = enrollment.course.name
+    enrollment_dict['batch_code'] = enrollment.course.batch_code
+    
+    return EnrollmentResponse(**enrollment_dict)
+
 @router.get("/{enrollment_id}", response_model=EnrollmentResponse)
 def get_enrollment(enrollment_id: int, db: Session = Depends(get_db)):
     """Get a specific enrollment by ID."""

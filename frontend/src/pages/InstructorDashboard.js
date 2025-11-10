@@ -206,7 +206,7 @@ function InstructorDashboard() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            View all pending enrollments (eligible and ineligible). Click on a row to see full user details and eligibility reasons.
+            View all pending enrollments 
           </Typography>
           <Box display="flex" gap={2} flexWrap="wrap">
             <TextField
@@ -347,7 +347,7 @@ function InstructorDashboard() {
               {enrollments.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={9} align="center">
-                    No new submissions pending approval. New form submissions will appear here after eligibility checks.
+                    No new submissions pending approval. 
                   </TableCell>
                 </TableRow>
               )}
