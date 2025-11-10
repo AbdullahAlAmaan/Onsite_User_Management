@@ -45,7 +45,22 @@ def get_courses(
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db)
 ):
-    """Get all courses with optional filters."""
+    """Get all courses with optional filters. Automatically archives courses past their end_date."""
+    # Auto-archive courses that have ended
+    today = date.today()
+    courses_to_archive = db.query(Course).filter(
+        Course.is_archived == False,
+        Course.end_date.isnot(None),
+        Course.end_date < today
+    ).all()
+    
+    for course in courses_to_archive:
+        course.is_archived = True
+    
+    if courses_to_archive:
+        db.commit()
+    
+    # Now fetch courses based on filter
     query = db.query(Course)
     
     if archived is not None:

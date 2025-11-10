@@ -24,6 +24,8 @@ import {
   DialogActions,
   Grid,
   Divider,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import { CheckCircle, Cancel, Visibility } from '@mui/icons-material';
 import { enrollmentsAPI, coursesAPI, studentsAPI } from '../services/api';
@@ -31,6 +33,7 @@ import UserDetailsDialog from '../components/UserDetailsDialog';
 import CourseDetailsDialog from '../components/CourseDetailsDialog';
 
 function InstructorDashboard() {
+  const theme = useTheme();
   const [enrollments, setEnrollments] = useState([]);
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState('');
@@ -180,19 +183,49 @@ function InstructorDashboard() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Approval Dashboard
-      </Typography>
+      <Box mb={4}>
+        <Typography 
+          variant="h4" 
+          gutterBottom
+          sx={{ 
+            fontWeight: 600,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          Approval Dashboard
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Review and approve pending enrollment requests
+        </Typography>
+      </Box>
 
       {message && (
-        <Alert severity={message.type} sx={{ mb: 2 }} onClose={() => setMessage(null)}>
+        <Alert 
+          severity={message.type} 
+          sx={{ 
+            mb: 3,
+            borderRadius: 2,
+            boxShadow: `0 4px 12px ${alpha(theme.palette[message.type === 'success' ? 'success' : 'error'].main, 0.15)}`,
+          }} 
+          onClose={() => setMessage(null)}
+        >
           {message.text}
         </Alert>
       )}
 
-      <Card sx={{ mb: 3 }}>
+      <Card 
+        sx={{ 
+          mb: 3,
+          borderRadius: 3,
+          boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+        }}
+      >
         <CardContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontWeight: 500 }}>
             View all pending enrollments 
           </Typography>
           <Box display="flex" gap={2} flexWrap="wrap">
@@ -230,6 +263,15 @@ function InstructorDashboard() {
                 variant="contained"
                 color="primary"
                 onClick={handleBulkApprove}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                  '&:hover': {
+                    boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
+                  },
+                }}
               >
                 Approve Selected ({selectedIds.size})
               </Button>
@@ -243,10 +285,18 @@ function InstructorDashboard() {
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
+        <Card
+          sx={{
+            borderRadius: 3,
+            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            overflow: 'hidden',
+          }}
+        >
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
                 <TableCell padding="checkbox">
                   <Checkbox
                     indeterminate={selectedIds.size > 0 && selectedIds.size < enrollments.length}
@@ -254,14 +304,14 @@ function InstructorDashboard() {
                     onChange={handleSelectAll}
                   />
                 </TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>SBU</TableCell>
-                <TableCell>Course</TableCell>
-                <TableCell>Batch Code</TableCell>
-                <TableCell>Eligibility</TableCell>
-                <TableCell>Actions</TableCell>
-                <TableCell>Details</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Course</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Batch Code</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Eligibility</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Details</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -341,6 +391,7 @@ function InstructorDashboard() {
             </TableBody>
           </Table>
         </TableContainer>
+        </Card>
       )}
 
       {/* User Details Dialog */}

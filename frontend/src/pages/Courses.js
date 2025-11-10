@@ -22,8 +22,10 @@ import {
   Card,
   CardContent,
   Alert,
+  useTheme,
+  alpha,
 } from '@mui/material';
-import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, Visibility } from '@mui/icons-material';
+import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, Visibility, History } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -32,8 +34,10 @@ import UserDetailsDialog from '../components/UserDetailsDialog';
 import CourseDetailsDialog from '../components/CourseDetailsDialog';
 
 function Courses() {
+  const theme = useTheme();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const [open, setOpen] = useState(false);
   const [expandedCourse, setExpandedCourse] = useState(null);
   const [courseEnrollments, setCourseEnrollments] = useState({});
@@ -58,12 +62,12 @@ function Courses() {
 
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [showArchived]);
 
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      const response = await coursesAPI.getAll({ archived: false });
+      const response = await coursesAPI.getAll({ archived: showArchived });
       setCourses(response.data);
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -185,15 +189,73 @@ function Courses() {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h4">Courses</Typography>
-        <Button variant="contained" startIcon={<Add />} onClick={handleOpen}>
-          New Course
-        </Button>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Box>
+          <Typography 
+            variant="h4" 
+            gutterBottom
+            sx={{ 
+              fontWeight: 600,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
+            {showArchived ? 'Archived Courses' : 'Course Management'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {showArchived ? 'View historical course data and enrollments' : 'Manage active courses and enrollments'}
+          </Typography>
+        </Box>
+        <Box display="flex" gap={2}>
+          <Button
+            variant={showArchived ? "contained" : "outlined"}
+            startIcon={<History />}
+            onClick={() => {
+              setShowArchived(!showArchived);
+              setExpandedCourse(null);
+              setCourseEnrollments({});
+            }}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500,
+            }}
+          >
+            {showArchived ? "Show Active" : "Show Archived"}
+          </Button>
+          {!showArchived && (
+            <Button 
+              variant="contained" 
+              startIcon={<Add />} 
+              onClick={handleOpen}
+              sx={{
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 500,
+                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                '&:hover': {
+                  boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
+                },
+              }}
+            >
+              New Course
+            </Button>
+          )}
+        </Box>
       </Box>
 
       {message && (
-        <Alert severity={message.type} sx={{ mb: 2 }} onClose={() => setMessage(null)}>
+        <Alert 
+          severity={message.type} 
+          sx={{ 
+            mb: 3,
+            borderRadius: 2,
+            boxShadow: `0 4px 12px ${alpha(theme.palette[message.type === 'success' ? 'success' : 'error'].main, 0.15)}`,
+          }} 
+          onClose={() => setMessage(null)}
+        >
           {message.text}
         </Alert>
       )}
@@ -203,24 +265,39 @@ function Courses() {
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
+        <Card
+          sx={{
+            borderRadius: 3,
+            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            overflow: 'hidden',
+          }}
+        >
+          <TableContainer>
+            <Table>
             <TableHead>
-              <TableRow>
+              <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
                 <TableCell width={50}></TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Batch Code</TableCell>
-                <TableCell>Start Date</TableCell>
-                <TableCell>Seats</TableCell>
-                <TableCell>Enrolled</TableCell>
-                <TableCell>Available</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Batch Code</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Start Date</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Seats</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Enrolled</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Available</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {courses.map((course) => (
                 <React.Fragment key={course.id}>
-                  <TableRow>
+                  <TableRow
+                    sx={{
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.03),
+                      },
+                      transition: 'background-color 0.2s',
+                    }}
+                  >
                     <TableCell>
                       <IconButton
                         size="small"
@@ -242,12 +319,18 @@ function Courses() {
                       />
                     </TableCell>
                     <TableCell>
-                      <IconButton
-                        color="secondary"
-                        onClick={() => handleArchive(course.id)}
-                      >
-                        <Archive />
-                      </IconButton>
+                      {!showArchived && (
+                        <IconButton
+                          color="secondary"
+                          onClick={() => handleArchive(course.id)}
+                          title="Archive Course"
+                        >
+                          <Archive />
+                        </IconButton>
+                      )}
+                      {showArchived && (
+                        <Chip label="Archived" color="default" size="small" />
+                      )}
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -260,7 +343,14 @@ function Courses() {
                           {loadingEnrollments[course.id] ? (
                             <CircularProgress size={24} />
                           ) : courseEnrollments[course.id] && courseEnrollments[course.id].length > 0 ? (
-                            <TableContainer component={Paper} variant="outlined">
+                            <TableContainer 
+                              component={Paper} 
+                              variant="outlined"
+                              sx={{
+                                borderRadius: 2,
+                                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                              }}
+                            >
                               <Table size="small">
                                 <TableHead>
                                   <TableRow>
@@ -317,7 +407,7 @@ function Courses() {
                                           >
                                             <Visibility />
                                           </IconButton>
-                                          {enrollment.approval_status === 'Approved' && (
+                                          {enrollment.approval_status === 'Approved' && !showArchived && (
                                             <IconButton
                                               size="small"
                                               color="error"
@@ -348,10 +438,22 @@ function Courses() {
             </TableBody>
           </Table>
         </TableContainer>
+        </Card>
       )}
 
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>Create New Course</DialogTitle>
+      <Dialog 
+        open={open} 
+        onClose={handleClose} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Create New Course</DialogTitle>
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} mt={1}>
             <TextField
@@ -409,8 +511,19 @@ function Courses() {
       </Dialog>
 
       {/* Withdraw Dialog */}
-      <Dialog open={withdrawDialogOpen} onClose={handleWithdrawCancel} maxWidth="sm" fullWidth>
-        <DialogTitle>Withdraw Student from Course</DialogTitle>
+      <Dialog 
+        open={withdrawDialogOpen} 
+        onClose={handleWithdrawCancel} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: `0 8px 32px ${alpha(theme.palette.error.main, 0.2)}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Withdraw Student from Course</DialogTitle>
         <DialogContent>
           {selectedEnrollment && (
             <Box sx={{ mt: 1 }}>

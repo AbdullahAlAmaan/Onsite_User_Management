@@ -36,22 +36,31 @@ class EligibilityService:
     @staticmethod
     def check_duplicate(db: Session, student_id: int, course_id: int) -> Tuple[bool, Optional[str]]:
         """
-        Check if student is already enrolled in this course.
+        Check if student is already enrolled in this course (by course name, not batch).
         Returns (is_eligible, reason_if_ineligible)
         """
-        # Check for any existing enrollment (including completed/withdrawn)
-        existing_enrollment = db.query(Enrollment).filter(
-            Enrollment.student_id == student_id,
-            Enrollment.course_id == course_id
-        ).first()
+        # Get the course they're trying to enroll in
+        target_course = db.query(Course).filter(Course.id == course_id).first()
+        if not target_course:
+            return True, None
         
-        if existing_enrollment:
-            course = db.query(Course).filter(Course.id == course_id).first()
-            # If they completed it, mention that
-            if existing_enrollment.completion_status == "Completed":
-                return False, f"Already completed {course.name if course else 'this course'}"
+        # Check for any existing enrollment in a course with the same name
+        # (different batches of the same course should be considered duplicates)
+        existing_enrollments = db.query(Enrollment).join(Course).filter(
+            Enrollment.student_id == student_id,
+            Course.name == target_course.name
+        ).all()
+        
+        if existing_enrollments:
+            # Check if any of them are completed
+            completed_enrollment = next(
+                (e for e in existing_enrollments if e.completion_status == "Completed"),
+                None
+            )
+            if completed_enrollment:
+                return False, f"Already completed a batch of {target_course.name}"
             # Otherwise just say already enrolled
-            return False, f"Already enrolled in {course.name if course else 'this course'}"
+            return False, f"Already enrolled in a batch of {target_course.name}"
         
         return True, None
     

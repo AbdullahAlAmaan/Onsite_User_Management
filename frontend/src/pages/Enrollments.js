@@ -12,7 +12,11 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  IconButton
+  IconButton,
+  Card,
+  CardContent,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import { PersonRemove, Visibility } from '@mui/icons-material';
 import { enrollmentsAPI } from '../services/api';
@@ -20,6 +24,7 @@ import UserDetailsDialog from '../components/UserDetailsDialog';
 import CourseDetailsDialog from '../components/CourseDetailsDialog';
 
 function Enrollments() {
+  const theme = useTheme();
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -155,63 +160,129 @@ function Enrollments() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Enrollments
-      </Typography>
+      <Box mb={4}>
+        <Typography 
+          variant="h4" 
+          gutterBottom
+          sx={{ 
+            fontWeight: 600,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          Enrollments Management
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          View and manage all course enrollments
+        </Typography>
+      </Box>
 
       {message && (
-        <Alert severity={message.type} sx={{ mb: 2 }} onClose={() => setMessage(null)}>
+        <Alert 
+          severity={message.type} 
+          sx={{ 
+            mb: 3,
+            borderRadius: 2,
+            boxShadow: `0 4px 12px ${alpha(theme.palette[message.type === 'success' ? 'success' : 'error'].main, 0.15)}`,
+          }} 
+          onClose={() => setMessage(null)}
+        >
           {message.text}
         </Alert>
       )}
       
-      <Box display="flex" gap={2} mb={2}>
-        <TextField
-          select
-          label="Eligibility Status"
-          value={filters.eligibility_status}
-          onChange={(e) => setFilters({ ...filters, eligibility_status: e.target.value })}
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="">All</MenuItem>
-          <MenuItem value="Eligible">Eligible</MenuItem>
-          <MenuItem value="Ineligible (Missing Prerequisite)">Missing Prerequisite</MenuItem>
-          <MenuItem value="Ineligible (Already Taken)">Already Taken</MenuItem>
-          <MenuItem value="Ineligible (Annual Limit)">Annual Limit</MenuItem>
-        </TextField>
-        <TextField
-          select
-          label="Approval Status"
-          value={filters.approval_status}
-          onChange={(e) => setFilters({ ...filters, approval_status: e.target.value })}
-          sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="">All</MenuItem>
-          <MenuItem value="Pending">Pending</MenuItem>
-          <MenuItem value="Approved">Approved</MenuItem>
-          <MenuItem value="Rejected">Rejected</MenuItem>
-        </TextField>
-      </Box>
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 3,
+          boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+        }}
+      >
+        <CardContent>
+          <Box display="flex" gap={2} flexWrap="wrap">
+            <TextField
+              select
+              label="Eligibility Status"
+              value={filters.eligibility_status}
+              onChange={(e) => setFilters({ ...filters, eligibility_status: e.target.value })}
+              sx={{ minWidth: 200 }}
+              variant="outlined"
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="Eligible">Eligible</MenuItem>
+              <MenuItem value="Ineligible (Missing Prerequisite)">Missing Prerequisite</MenuItem>
+              <MenuItem value="Ineligible (Already Taken)">Already Taken</MenuItem>
+              <MenuItem value="Ineligible (Annual Limit)">Annual Limit</MenuItem>
+            </TextField>
+            <TextField
+              select
+              label="Approval Status"
+              value={filters.approval_status}
+              onChange={(e) => setFilters({ ...filters, approval_status: e.target.value })}
+              sx={{ minWidth: 200 }}
+              variant="outlined"
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="Pending">Pending</MenuItem>
+              <MenuItem value="Approved">Approved</MenuItem>
+              <MenuItem value="Rejected">Rejected</MenuItem>
+            </TextField>
+          </Box>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <Box display="flex" justifyContent="center" p={3}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ height: 600, width: '100%' }}>
-          <DataGrid
-            rows={enrollments}
-            columns={columns}
-            pageSize={10}
-            rowsPerPageOptions={[10, 25, 50]}
-            disableSelectionOnClick
-          />
-        </Box>
+        <Card
+          sx={{
+            borderRadius: 3,
+            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            overflow: 'hidden',
+          }}
+        >
+          <Box sx={{ height: 600, width: '100%' }}>
+            <DataGrid
+              rows={enrollments}
+              columns={columns}
+              pageSize={10}
+              rowsPerPageOptions={[10, 25, 50]}
+              disableSelectionOnClick
+              sx={{
+                border: 'none',
+                '& .MuiDataGrid-cell': {
+                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                },
+                '& .MuiDataGrid-columnHeaders': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                  borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                },
+              }}
+            />
+          </Box>
+        </Card>
       )}
 
       {/* Withdraw Dialog */}
-      <Dialog open={withdrawDialogOpen} onClose={handleWithdrawCancel} maxWidth="sm" fullWidth>
-        <DialogTitle>Withdraw Student from Course</DialogTitle>
+      <Dialog 
+        open={withdrawDialogOpen} 
+        onClose={handleWithdrawCancel} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: `0 8px 32px ${alpha(theme.palette.error.main, 0.2)}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Withdraw Student from Course</DialogTitle>
         <DialogContent>
           {selectedEnrollment && (
             <Box sx={{ mt: 1 }}>

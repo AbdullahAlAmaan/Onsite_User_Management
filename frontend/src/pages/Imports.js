@@ -14,11 +14,14 @@ import {
   MenuItem,
   Tabs,
   Tab,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import { UploadFile, People, Assessment } from '@mui/icons-material';
 import { importsAPI, coursesAPI, completionsAPI } from '../services/api';
 
 function Imports() {
+  const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
   const [file, setFile] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState('');
@@ -124,19 +127,63 @@ function Imports() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Data Import
-      </Typography>
+      <Box mb={4}>
+        <Typography 
+          variant="h4" 
+          gutterBottom
+          sx={{ 
+            fontWeight: 600,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          Data Import
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Upload enrollment registrations or assessment scores
+        </Typography>
+      </Box>
 
       {message && (
-        <Alert severity={message.type} sx={{ mb: 2 }} onClose={() => setMessage(null)}>
+        <Alert 
+          severity={message.type} 
+          sx={{ 
+            mb: 3,
+            borderRadius: 2,
+            boxShadow: `0 4px 12px ${alpha(theme.palette[message.type === 'success' ? 'success' : 'error'].main, 0.15)}`,
+          }} 
+          onClose={() => setMessage(null)}
+        >
           {message.text}
         </Alert>
       )}
 
-      <Card>
+      <Card
+        sx={{
+          borderRadius: 3,
+          boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+        }}
+      >
         <CardContent>
-          <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
+          <Tabs 
+            value={tabValue} 
+            onChange={handleTabChange} 
+            sx={{ 
+              mb: 3,
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 500,
+                borderRadius: 2,
+                minHeight: 48,
+              },
+              '& .Mui-selected': {
+                color: theme.palette.primary.main,
+              },
+            }}
+          >
             <Tab icon={<People />} iconPosition="start" label="Enrollment Registrations" />
             <Tab icon={<Assessment />} iconPosition="start" label="Scores & Assessment" />
           </Tabs>
@@ -164,16 +211,56 @@ function Imports() {
                 ))}
               </TextField>
             )}
-            <Button variant="outlined" component="label" startIcon={<UploadFile />}>
+            <Button 
+              variant="outlined" 
+              component="label" 
+              startIcon={<UploadFile />}
+              sx={{
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 500,
+                borderStyle: 'dashed',
+                borderWidth: 2,
+                '&:hover': {
+                  borderStyle: 'dashed',
+                  borderWidth: 2,
+                },
+              }}
+            >
               Select File
               <input type="file" hidden accept=".xlsx,.xls,.csv" onChange={handleFileChange} />
             </Button>
-            {file && <Typography variant="body2">Selected: {file.name}</Typography>}
+            {file && (
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  p: 1.5, 
+                  borderRadius: 2,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                  color: theme.palette.primary.main,
+                  fontWeight: 500,
+                }}
+              >
+                Selected: {file.name}
+              </Typography>
+            )}
             <Box display="flex" gap={2}>
               <Button
                 variant="contained"
                 onClick={handleExcelUpload}
                 disabled={!file || !selectedCourse || loading}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                  '&:hover': {
+                    boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
+                  },
+                  '&:disabled': {
+                    boxShadow: 'none',
+                  },
+                }}
               >
                 Upload Excel
               </Button>
@@ -181,6 +268,18 @@ function Imports() {
                 variant="contained"
                 onClick={handleCSVUpload}
                 disabled={!file || !selectedCourse || loading}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                  '&:hover': {
+                    boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
+                  },
+                  '&:disabled': {
+                    boxShadow: 'none',
+                  },
+                }}
               >
                 Upload CSV
               </Button>
@@ -191,9 +290,23 @@ function Imports() {
       </Card>
 
       {results && (
-        <Card sx={{ mt: 3 }}>
+        <Card 
+          sx={{ 
+            mt: 3,
+            borderRadius: 3,
+            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+          }}
+        >
           <CardContent>
-            <Typography variant="h6" gutterBottom>
+            <Typography 
+              variant="h6" 
+              gutterBottom
+              sx={{ 
+                fontWeight: 600,
+                mb: 2,
+              }}
+            >
               Import Results
             </Typography>
             <List>
