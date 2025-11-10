@@ -38,7 +38,25 @@ function Enrollments() {
     { field: 'student_sbu', headerName: 'SBU', width: 120 },
     { field: 'course_name', headerName: 'Course', width: 200 },
     { field: 'batch_code', headerName: 'Batch', width: 150 },
-    { field: 'eligibility_status', headerName: 'Eligibility', width: 180 },
+    { 
+      field: 'eligibility_status', 
+      headerName: 'Eligibility', 
+      width: 180,
+      renderCell: (params) => (
+        <span style={{ 
+          color: params.value === 'Eligible' ? 'green' : 'red',
+          fontWeight: params.value === 'Eligible' ? 'bold' : 'normal'
+        }}>
+          {params.value}
+        </span>
+      )
+    },
+    { 
+      field: 'eligibility_reason', 
+      headerName: 'Reason', 
+      width: 250,
+      renderCell: (params) => params.value || '-'
+    },
     { field: 'approval_status', headerName: 'Approval', width: 130 },
     { field: 'completion_status', headerName: 'Completion', width: 130 },
   ];

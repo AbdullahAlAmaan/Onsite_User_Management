@@ -3,12 +3,13 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Enrollments from './pages/Enrollments';
 import Courses from './pages/Courses';
 import InstructorDashboard from './pages/InstructorDashboard';
-import Reports from './pages/Reports';
 import Imports from './pages/Imports';
+import PrivateRoute from './components/PrivateRoute';
 
 const theme = createTheme({
   palette: {
@@ -26,17 +27,15 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/enrollments" element={<Enrollments />} />
-            <Route path="/courses" element={<Courses />} />
-            <Route path="/instructor" element={<InstructorDashboard />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/imports" element={<Imports />} />
-          </Routes>
-        </Layout>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<PrivateRoute><Layout><Navigate to="/dashboard" replace /></Layout></PrivateRoute>} />
+          <Route path="/dashboard" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
+          <Route path="/enrollments" element={<PrivateRoute><Layout><Enrollments /></Layout></PrivateRoute>} />
+          <Route path="/courses" element={<PrivateRoute><Layout><Courses /></Layout></PrivateRoute>} />
+          <Route path="/instructor" element={<PrivateRoute><Layout><InstructorDashboard /></Layout></PrivateRoute>} />
+          <Route path="/imports" element={<PrivateRoute><Layout><Imports /></Layout></PrivateRoute>} />
+        </Routes>
       </Router>
     </ThemeProvider>
   );

@@ -9,6 +9,12 @@ const api = axios.create({
   },
 });
 
+// Initialize token from localStorage if available
+const token = localStorage.getItem('token');
+if (token) {
+  api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+}
+
 // Request interceptor for adding auth tokens
 api.interceptors.request.use(
   (config) => {
@@ -29,13 +35,22 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      delete api.defaults.headers.common['Authorization'];
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
 
 export default api;
+
+// Auth API
+export const authAPI = {
+  login: (email, password) => api.post('/auth/login', { email, password }),
+  getMe: () => api.get('/auth/me'),
+};
 
 // API endpoints
 export const enrollmentsAPI = {
@@ -59,6 +74,7 @@ export const studentsAPI = {
   getAll: (params) => api.get('/students', { params }),
   getById: (id) => api.get(`/students/${id}`),
   create: (data) => api.post('/students', data),
+  getEnrollments: (id) => api.get(`/students/${id}/enrollments`),
 };
 
 export const importsAPI = {
@@ -91,10 +107,4 @@ export const completionsAPI = {
   update: (id, data) => api.put(`/completions/${id}`, data),
 };
 
-export const reportsAPI = {
-  getSummary: (params) => api.get('/reports/summary', { params }),
-  getKPIs: () => api.get('/reports/dashboard/kpis'),
-  exportCSV: (params) => api.get('/reports/export/csv', { params, responseType: 'blob' }),
-  exportPDF: (params) => api.get('/reports/export/pdf', { params, responseType: 'blob' }),
-};
 

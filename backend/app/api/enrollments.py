@@ -45,6 +45,9 @@ def get_enrollments(
         enrollment_dict['student_name'] = enrollment.student.name
         enrollment_dict['student_email'] = enrollment.student.email
         enrollment_dict['student_sbu'] = enrollment.student.sbu.value
+        enrollment_dict['student_employee_id'] = enrollment.student.employee_id
+        enrollment_dict['student_designation'] = enrollment.student.designation
+        enrollment_dict['student_experience_years'] = enrollment.student.experience_years
         enrollment_dict['course_name'] = enrollment.course.name
         enrollment_dict['batch_code'] = enrollment.course.batch_code
         result.append(EnrollmentResponse(**enrollment_dict))
@@ -77,6 +80,9 @@ def get_eligible_enrollments(
         enrollment_dict['student_name'] = enrollment.student.name
         enrollment_dict['student_email'] = enrollment.student.email
         enrollment_dict['student_sbu'] = enrollment.student.sbu.value
+        enrollment_dict['student_employee_id'] = enrollment.student.employee_id
+        enrollment_dict['student_designation'] = enrollment.student.designation
+        enrollment_dict['student_experience_years'] = enrollment.student.experience_years
         enrollment_dict['course_name'] = enrollment.course.name
         enrollment_dict['batch_code'] = enrollment.course.batch_code
         result.append(EnrollmentResponse(**enrollment_dict))
@@ -86,7 +92,7 @@ def get_eligible_enrollments(
 @router.post("/approve", response_model=EnrollmentResponse)
 def approve_enrollment(
     approval: EnrollmentApproval,
-    approved_by: str = Query(..., description="Instructor/Admin name"),
+    approved_by: str = Query(..., description="Admin name"),
     db: Session = Depends(get_db)
 ):
     """Approve or reject a single enrollment."""
@@ -94,13 +100,13 @@ def approve_enrollment(
     if not enrollment:
         raise HTTPException(status_code=404, detail="Enrollment not found")
     
-    if enrollment.eligibility_status != "Eligible":
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Cannot approve enrollment with status: {enrollment.eligibility_status}"
-        )
-    
     if approval.approved:
+        # Only check eligibility when approving, not when rejecting
+        if enrollment.eligibility_status != "Eligible":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot approve enrollment with status: {enrollment.eligibility_status}"
+            )
         # Check seat availability
         course = db.query(Course).filter(Course.id == enrollment.course_id).first()
         if course.current_enrolled >= course.seat_limit:
@@ -123,6 +129,9 @@ def approve_enrollment(
     enrollment_dict['student_name'] = enrollment.student.name
     enrollment_dict['student_email'] = enrollment.student.email
     enrollment_dict['student_sbu'] = enrollment.student.sbu.value
+    enrollment_dict['student_employee_id'] = enrollment.student.employee_id
+    enrollment_dict['student_designation'] = enrollment.student.designation
+    enrollment_dict['student_experience_years'] = enrollment.student.experience_years
     enrollment_dict['course_name'] = enrollment.course.name
     enrollment_dict['batch_code'] = enrollment.course.batch_code
     
@@ -131,7 +140,7 @@ def approve_enrollment(
 @router.post("/approve/bulk", response_model=dict)
 def bulk_approve_enrollments(
     bulk_approval: EnrollmentBulkApproval,
-    approved_by: str = Query(..., description="Instructor/Admin name"),
+    approved_by: str = Query(..., description="Admin name"),
     db: Session = Depends(get_db)
 ):
     """Bulk approve multiple enrollments."""
@@ -190,6 +199,9 @@ def get_enrollment(enrollment_id: int, db: Session = Depends(get_db)):
     enrollment_dict['student_name'] = enrollment.student.name
     enrollment_dict['student_email'] = enrollment.student.email
     enrollment_dict['student_sbu'] = enrollment.student.sbu.value
+    enrollment_dict['student_employee_id'] = enrollment.student.employee_id
+    enrollment_dict['student_designation'] = enrollment.student.designation
+    enrollment_dict['student_experience_years'] = enrollment.student.experience_years
     enrollment_dict['course_name'] = enrollment.course.name
     enrollment_dict['batch_code'] = enrollment.course.batch_code
     

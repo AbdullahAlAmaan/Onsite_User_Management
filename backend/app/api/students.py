@@ -44,3 +44,32 @@ def get_student(student_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Student not found")
     return StudentResponse.from_orm(student)
 
+@router.get("/{student_id}/enrollments", response_model=List[dict])
+def get_student_enrollments(student_id: int, db: Session = Depends(get_db)):
+    """Get all enrollments for a specific student with full course details."""
+    from app.models.enrollment import Enrollment
+    from app.schemas.enrollment import EnrollmentResponse
+    
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    enrollments = db.query(Enrollment).filter(Enrollment.student_id == student_id).order_by(Enrollment.created_at.desc()).all()
+    
+    result = []
+    for enrollment in enrollments:
+        enrollment_dict = EnrollmentResponse.from_orm(enrollment).dict()
+        enrollment_dict['student_name'] = enrollment.student.name
+        enrollment_dict['student_email'] = enrollment.student.email
+        enrollment_dict['student_sbu'] = enrollment.student.sbu.value
+        enrollment_dict['student_employee_id'] = enrollment.student.employee_id
+        enrollment_dict['student_designation'] = enrollment.student.designation
+        enrollment_dict['student_experience_years'] = enrollment.student.experience_years
+        enrollment_dict['course_name'] = enrollment.course.name
+        enrollment_dict['batch_code'] = enrollment.course.batch_code
+        enrollment_dict['course_start_date'] = enrollment.course.start_date.isoformat() if enrollment.course.start_date else None
+        enrollment_dict['course_end_date'] = enrollment.course.end_date.isoformat() if enrollment.course.end_date else None
+        result.append(enrollment_dict)
+    
+    return result
+

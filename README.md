@@ -1,22 +1,23 @@
 # Physical Course Enrollment Management System
 
-A comprehensive system for managing physical course enrollments with automated eligibility checks, instructor approvals, and completion tracking.
+Admin-only system for managing physical course enrollments with automated eligibility checks, approvals, and completion tracking.
 
 ## Features
 
-- **Automated Enrollment Intake**: Microsoft Forms integration via Graph API + manual Excel upload
+- **Automated Enrollment Intake**: Manual Excel/CSV upload (Form submissions → staging → validation)
 - **Eligibility Engine**: Three-tier validation (Prerequisites, Duplicates, Annual Limit)
-- **Instructor Dashboard**: Approval workflow with seat management
-- **Course Management**: Batch creation, scheduling, and lifecycle management
+- **Admin Dashboard**: View all submissions, filtered eligible candidates, and approval workflow
+- **Course Management**: Admin creates and manages courses, batches, and seat limits
 - **Completion Tracking**: Score uploads with audit trails
 - **Reporting & Analytics**: Real-time dashboards with CSV/PDF exports
+- **Admin Authentication**: Secure login with email/password authentication
 
 ## Tech Stack
 
 - **Backend**: FastAPI (Python)
-- **Frontend**: React with TypeScript
+- **Frontend**: React with Material UI
 - **Database**: PostgreSQL
-- **Authentication**: Azure AD
+- **Authentication**: JWT-based admin authentication
 - **File Processing**: pandas, openpyxl
 
 ## Project Structure
@@ -141,6 +142,10 @@ DATABASE_URL=postgresql://username:password@localhost:5432/enrollment_db
 # REQUIRED: Secret key for JWT tokens (generate a random string)
 SECRET_KEY=your-secret-key-change-this-to-random-string
 
+# REQUIRED: Admin authentication credentials
+ADMIN_EMAIL=your-admin-email@example.com
+ADMIN_PASSWORD=your-secure-password
+
 # Optional: CORS origins (defaults work for localhost)
 CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
 ```
@@ -165,10 +170,10 @@ Create `frontend/.env` (optional, defaults work for localhost):
 REACT_APP_API_URL=http://localhost:8000/api/v1
 ```
 
-**Note:** Without Azure configuration, the system will:
-- ✅ Store uploaded files locally in `backend/uploads/`
-- ✅ Work with manual Excel/CSV uploads
-- ❌ Microsoft Forms import will be disabled (can be added later)
+**Note:** 
+- All API endpoints (except `/auth/login` and `/health`) require admin authentication
+- Admin credentials are stored in `.env` file (already in `.gitignore`)
+- Files are stored locally in `backend/uploads/` if Azure Blob Storage is not configured
 
 ## Database Schema
 
@@ -184,17 +189,20 @@ Once running, visit `http://localhost:8000/docs` for interactive API documentati
 ## Key Features Implemented
 
 ✅ **Enrollment Intake & Validation**
-- Manual Excel/CSV upload (Microsoft Forms integration available with Azure setup)
+- Manual Excel/CSV upload
+- Form submissions stored in staging table (`incoming_enrollments`)
 - Automated eligibility checks (Prerequisites, Duplicates, Annual Limit)
-- Staging table for raw submissions
+- Admin sees all submissions with eligibility status and reasons
 
-✅ **Instructor Approval Workflow**
-- Dashboard with filters (SBU, course, designation)
+✅ **Admin Approval Workflow**
+- View all submissions (total signups)
+- Filter eligible candidates with reasoning
 - Bulk approval capabilities
 - Seat limit enforcement
 - Real-time seat counter
 
-✅ **Course & Batch Management**
+✅ **Course & Batch Management (Admin Only)**
+- Admin creates all courses
 - Course creation with prerequisites
 - Batch scheduling
 - Seat management

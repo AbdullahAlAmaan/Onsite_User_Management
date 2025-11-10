@@ -25,6 +25,9 @@ class EnrollmentResponse(BaseModel):
     student_name: Optional[str] = None
     student_email: Optional[str] = None
     student_sbu: Optional[str] = None
+    student_employee_id: Optional[str] = None
+    student_designation: Optional[str] = None
+    student_experience_years: Optional[int] = None
     course_name: Optional[str] = None
     batch_code: Optional[str] = None
     

@@ -12,14 +12,16 @@ import {
   ListItemText,
   Toolbar,
   Typography,
+  Button,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SchoolIcon from '@mui/icons-material/School';
 import PeopleIcon from '@mui/icons-material/People';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useNavigate, useLocation } from 'react-router-dom';
+import api from '../services/api';
 
 const drawerWidth = 240;
 
@@ -27,8 +29,7 @@ const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Enrollments', icon: <PeopleIcon />, path: '/enrollments' },
   { text: 'Courses', icon: <SchoolIcon />, path: '/courses' },
-  { text: 'Instructor View', icon: <DashboardIcon />, path: '/instructor' },
-  { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
+  { text: 'Approvals', icon: <DashboardIcon />, path: '/instructor' },
   { text: 'Imports', icon: <UploadFileIcon />, path: '/imports' },
 ];
 
@@ -39,6 +40,12 @@ function Layout({ children }) {
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    delete api.defaults.headers.common['Authorization'];
+    navigate('/login');
   };
 
   const drawer = (
@@ -87,9 +94,12 @@ function Layout({ children }) {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Physical Course Enrollment Management
           </Typography>
+          <Button color="inherit" startIcon={<LogoutIcon />} onClick={handleLogout}>
+            Logout
+          </Button>
         </Toolbar>
       </AppBar>
       <Box

@@ -18,17 +18,23 @@ import {
   Chip,
   IconButton,
   CircularProgress,
+  Collapse,
+  Card,
+  CardContent,
 } from '@mui/material';
-import { Add, Edit, Archive } from '@mui/icons-material';
+import { Add, Edit, Archive, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { coursesAPI } from '../services/api';
+import { coursesAPI, enrollmentsAPI } from '../services/api';
 
 function Courses() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [expandedCourse, setExpandedCourse] = useState(null);
+  const [courseEnrollments, setCourseEnrollments] = useState({});
+  const [loadingEnrollments, setLoadingEnrollments] = useState({});
   const [formData, setFormData] = useState({
     name: '',
     batch_code: '',
@@ -99,6 +105,25 @@ function Courses() {
     }
   };
 
+  const handleToggleExpand = async (courseId) => {
+    if (expandedCourse === courseId) {
+      setExpandedCourse(null);
+    } else {
+      setExpandedCourse(courseId);
+      if (!courseEnrollments[courseId]) {
+        setLoadingEnrollments({ ...loadingEnrollments, [courseId]: true });
+        try {
+          const response = await enrollmentsAPI.getAll({ course_id: courseId });
+          setCourseEnrollments({ ...courseEnrollments, [courseId]: response.data });
+        } catch (error) {
+          console.error('Error fetching enrollments:', error);
+        } finally {
+          setLoadingEnrollments({ ...loadingEnrollments, [courseId]: false });
+        }
+      }
+    }
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -117,6 +142,7 @@ function Courses() {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell width={50}></TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Batch Code</TableCell>
                 <TableCell>Start Date</TableCell>
@@ -128,28 +154,102 @@ function Courses() {
             </TableHead>
             <TableBody>
               {courses.map((course) => (
-                <TableRow key={course.id}>
-                  <TableCell>{course.name}</TableCell>
-                  <TableCell>{course.batch_code}</TableCell>
-                  <TableCell>{course.start_date}</TableCell>
-                  <TableCell>{course.seat_limit}</TableCell>
-                  <TableCell>{course.current_enrolled}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={course.seat_limit - course.current_enrolled}
-                      color={course.seat_limit - course.current_enrolled > 0 ? 'success' : 'error'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      color="secondary"
-                      onClick={() => handleArchive(course.id)}
-                    >
-                      <Archive />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
+                <React.Fragment key={course.id}>
+                  <TableRow>
+                    <TableCell>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleToggleExpand(course.id)}
+                      >
+                        {expandedCourse === course.id ? <ExpandLess /> : <ExpandMore />}
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>{course.name}</TableCell>
+                    <TableCell>{course.batch_code}</TableCell>
+                    <TableCell>{course.start_date}</TableCell>
+                    <TableCell>{course.seat_limit}</TableCell>
+                    <TableCell>{course.current_enrolled}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={course.seat_limit - course.current_enrolled}
+                        color={course.seat_limit - course.current_enrolled > 0 ? 'success' : 'error'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <IconButton
+                        color="secondary"
+                        onClick={() => handleArchive(course.id)}
+                      >
+                        <Archive />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+                      <Collapse in={expandedCourse === course.id} timeout="auto" unmountOnExit>
+                        <Box sx={{ margin: 2 }}>
+                          <Typography variant="h6" gutterBottom>
+                            Enrolled Students
+                          </Typography>
+                          {loadingEnrollments[course.id] ? (
+                            <CircularProgress size={24} />
+                          ) : courseEnrollments[course.id] && courseEnrollments[course.id].length > 0 ? (
+                            <TableContainer component={Paper} variant="outlined">
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>Student Name</TableCell>
+                                    <TableCell>Email</TableCell>
+                                    <TableCell>SBU</TableCell>
+                                    <TableCell>Eligibility</TableCell>
+                                    <TableCell>Approval Status</TableCell>
+                                    <TableCell>Completion Status</TableCell>
+                                    <TableCell>Score</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {courseEnrollments[course.id].map((enrollment) => (
+                                    <TableRow key={enrollment.id}>
+                                      <TableCell>{enrollment.student_name}</TableCell>
+                                      <TableCell>{enrollment.student_email}</TableCell>
+                                      <TableCell>
+                                        <Chip label={enrollment.student_sbu} size="small" />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Chip
+                                          label={enrollment.eligibility_status}
+                                          color={enrollment.eligibility_status === 'Eligible' ? 'success' : 'error'}
+                                          size="small"
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Chip
+                                          label={enrollment.approval_status}
+                                          color={
+                                            enrollment.approval_status === 'Approved' ? 'success' :
+                                            enrollment.approval_status === 'Pending' ? 'warning' : 'error'
+                                          }
+                                          size="small"
+                                        />
+                                      </TableCell>
+                                      <TableCell>{enrollment.completion_status}</TableCell>
+                                      <TableCell>{enrollment.score || '-'}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              No enrollments yet
+                            </Typography>
+                          )}
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>

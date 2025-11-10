@@ -13,7 +13,7 @@ import {
   CheckCircle,
   Pending,
 } from '@mui/icons-material';
-import { reportsAPI } from '../services/api';
+import { enrollmentsAPI, coursesAPI } from '../services/api';
 
 function Dashboard() {
   const [kpis, setKpis] = useState(null);
@@ -25,8 +25,31 @@ function Dashboard() {
 
   const fetchKPIs = async () => {
     try {
-      const response = await reportsAPI.getKPIs();
-      setKpis(response.data);
+      // Fetch data from enrollments and courses APIs
+      const [enrollmentsRes, coursesRes] = await Promise.all([
+        enrollmentsAPI.getAll({ limit: 1000 }),
+        coursesAPI.getAll({ archived: false })
+      ]);
+      
+      const enrollments = enrollmentsRes.data;
+      const courses = coursesRes.data;
+      
+      // Calculate KPIs
+      const totalEnrollments = enrollments.length;
+      const eligiblePendingApproval = enrollments.filter(
+        e => e.eligibility_status === 'Eligible' && e.approval_status === 'Pending'
+      ).length;
+      const activeCourses = courses.length;
+      const totalSeatsAvailable = courses.reduce((sum, course) => {
+        return sum + Math.max(0, course.seat_limit - course.current_enrolled);
+      }, 0);
+      
+      setKpis({
+        total_enrollments: totalEnrollments,
+        eligible_pending_approval: eligiblePendingApproval,
+        active_courses: activeCourses,
+        total_seats_available: totalSeatsAvailable,
+      });
     } catch (error) {
       console.error('Error fetching KPIs:', error);
     } finally {

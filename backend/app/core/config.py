@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONNECTION_STRING: str = ""
     AZURE_STORAGE_CONTAINER: str = "enrollment-uploads"
     
+    # Admin Authentication
+    ADMIN_EMAIL: str = ""
+    ADMIN_PASSWORD: str = ""
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
