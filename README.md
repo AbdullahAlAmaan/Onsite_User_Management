@@ -43,65 +43,132 @@ Onsite_User_Management/
 └── README.md
 ```
 
-## Setup Instructions
+## MVP Setup Instructions (Local Development)
 
-### Quick Start with Docker
+### Prerequisites
 
-```bash
-# Start all services
-docker-compose up -d
+- Python 3.11+
+- Node.js 16+
+- PostgreSQL 15+ (or use SQLite for quick testing - see below)
 
-# Run database migrations
-docker-compose exec backend alembic upgrade head
+### Backend Setup
 
-# Access backend API at http://localhost:8000
-# Access frontend at http://localhost:3000
-```
-
-### Manual Setup
-
-#### Backend Setup
-
+1. **Create virtual environment:**
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+```
 
-# Set up database (PostgreSQL required)
-# Update DATABASE_URL in .env file
+2. **Install dependencies:**
+```bash
+pip install -r requirements.txt
+```
+
+3. **Set up database:**
+
+   **Option A: PostgreSQL (Recommended)**
+   ```bash
+   # Create database
+   createdb enrollment_db
+   # Or using psql:
+   # psql -U postgres
+   # CREATE DATABASE enrollment_db;
+   ```
+
+   **Option B: SQLite (Quick Testing)**
+   - Change `DATABASE_URL` in `.env` to: `sqlite:///./enrollment.db`
+   - Note: Some features may have limitations with SQLite
+
+4. **Create `.env` file:**
+```bash
+cp .env.example .env
+# Edit .env and set at minimum:
+# DATABASE_URL=postgresql://username:password@localhost:5432/enrollment_db
+# SECRET_KEY=your-secret-key-here
+```
+
+5. **Run database migrations:**
+```bash
 alembic upgrade head
+```
+
+6. **Start the backend:**
+```bash
 uvicorn app.main:app --reload
 ```
 
-#### Frontend Setup
+Backend will be available at: `http://localhost:8000`
+API docs at: `http://localhost:8000/docs`
 
+### Frontend Setup
+
+1. **Install dependencies:**
 ```bash
 cd frontend
 npm install
+```
+
+2. **Create `.env` file (optional):**
+```bash
+echo "REACT_APP_API_URL=http://localhost:8000/api/v1" > .env
+```
+
+3. **Start the frontend:**
+```bash
 npm start
 ```
 
+Frontend will be available at: `http://localhost:3000`
+
+### Quick Test
+
+1. Visit `http://localhost:3000`
+2. Go to "Courses" and create a test course
+3. Go to "Imports" and upload a sample Excel/CSV file
+4. Check "Enrollments" to see processed data
+
 ## Environment Variables
 
-Create `.env` files in both backend and frontend directories with:
+### Backend (.env) - MVP Minimum
 
-**Backend (.env)**
+Create `backend/.env` with these **required** variables:
+
+```env
+# REQUIRED: Database connection
+DATABASE_URL=postgresql://username:password@localhost:5432/enrollment_db
+
+# REQUIRED: Secret key for JWT tokens (generate a random string)
+SECRET_KEY=your-secret-key-change-this-to-random-string
+
+# Optional: CORS origins (defaults work for localhost)
+CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
 ```
-DATABASE_URL=postgresql://user:password@localhost/dbname
-AZURE_CLIENT_ID=your_client_id
-AZURE_CLIENT_SECRET=your_client_secret
-AZURE_TENANT_ID=your_tenant_id
-MICROSOFT_GRAPH_API_KEY=your_graph_api_key
-SECRET_KEY=your_secret_key
-AZURE_STORAGE_CONNECTION_STRING=your_azure_storage_connection_string
+
+**Optional (for future Azure integration):**
+```env
+# Azure AD (for Microsoft Forms - not needed for MVP)
+AZURE_CLIENT_ID=
+AZURE_CLIENT_SECRET=
+AZURE_TENANT_ID=
+
+# Azure Blob Storage (files stored locally if not set)
+AZURE_STORAGE_CONNECTION_STRING=
 AZURE_STORAGE_CONTAINER=enrollment-uploads
 ```
 
-**Frontend (.env)**
-```
+### Frontend (.env) - Optional
+
+Create `frontend/.env` (optional, defaults work for localhost):
+
+```env
 REACT_APP_API_URL=http://localhost:8000/api/v1
 ```
+
+**Note:** Without Azure configuration, the system will:
+- ✅ Store uploaded files locally in `backend/uploads/`
+- ✅ Work with manual Excel/CSV uploads
+- ❌ Microsoft Forms import will be disabled (can be added later)
 
 ## Database Schema
 
@@ -117,8 +184,7 @@ Once running, visit `http://localhost:8000/docs` for interactive API documentati
 ## Key Features Implemented
 
 ✅ **Enrollment Intake & Validation**
-- Microsoft Forms integration via Graph API
-- Manual Excel/CSV upload
+- Manual Excel/CSV upload (Microsoft Forms integration available with Azure setup)
 - Automated eligibility checks (Prerequisites, Duplicates, Annual Limit)
 - Staging table for raw submissions
 

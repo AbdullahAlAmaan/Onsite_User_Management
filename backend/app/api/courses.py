@@ -18,11 +18,13 @@ def create_course(course: CourseCreate, db: Session = Depends(get_db)):
     
     # Check for overlapping batches if needed
     if course.start_date:
+        from sqlalchemy import or_
+        end_date_check = course.end_date if course.end_date else date.today() + timedelta(days=365)
         overlapping = db.query(Course).filter(
             Course.name == course.name,
             Course.is_archived == False,
-            Course.start_date <= course.end_date if course.end_date else date.today() + timedelta(days=365),
-            Course.end_date >= course.start_date if course.end_date else date.today()
+            Course.start_date <= end_date_check,
+            or_(Course.end_date >= course.start_date, Course.end_date.is_(None))
         ).first()
         if overlapping:
             raise HTTPException(

@@ -76,11 +76,6 @@ export const importsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  importFromForms: (formId) => {
-    const formData = new FormData();
-    formData.append('form_id', formId);
-    return api.post('/imports/microsoft-forms', formData);
-  },
   getSyncStatus: () => api.get('/imports/sync-status'),
 };
 

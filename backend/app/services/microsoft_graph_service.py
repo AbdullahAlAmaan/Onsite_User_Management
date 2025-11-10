@@ -1,8 +1,13 @@
 import httpx
 from typing import List, Dict, Optional
 from app.core.config import settings
-from msal import ConfidentialClientApplication
 import json
+
+try:
+    from msal import ConfidentialClientApplication
+    MSAL_AVAILABLE = True
+except ImportError:
+    MSAL_AVAILABLE = False
 
 class MicrosoftGraphService:
     """Service for interacting with Microsoft Graph API to fetch form submissions."""
@@ -16,6 +21,9 @@ class MicrosoftGraphService:
         
     def get_access_token(self) -> Optional[str]:
         """Get access token using client credentials flow."""
+        if not MSAL_AVAILABLE:
+            raise Exception("msal package not installed. Install it to use Microsoft Forms integration.")
+        
         if not all([self.client_id, self.client_secret, self.tenant_id]):
             return None
         

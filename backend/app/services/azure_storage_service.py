@@ -1,7 +1,12 @@
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from app.core.config import settings
 from typing import Optional
 import os
+
+try:
+    from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+    AZURE_STORAGE_AVAILABLE = True
+except ImportError:
+    AZURE_STORAGE_AVAILABLE = False
 
 class AzureStorageService:
     """Service for handling file uploads to Azure Blob Storage."""
@@ -10,11 +15,15 @@ class AzureStorageService:
         self.connection_string = getattr(settings, 'AZURE_STORAGE_CONNECTION_STRING', None)
         self.container_name = getattr(settings, 'AZURE_STORAGE_CONTAINER', 'enrollment-uploads')
         
-        if self.connection_string:
-            self.blob_service_client = BlobServiceClient.from_connection_string(
-                self.connection_string
-            )
-            self._ensure_container_exists()
+        if self.connection_string and AZURE_STORAGE_AVAILABLE:
+            try:
+                self.blob_service_client = BlobServiceClient.from_connection_string(
+                    self.connection_string
+                )
+                self._ensure_container_exists()
+            except Exception as e:
+                print(f"Warning: Could not initialize Azure Blob Storage: {e}")
+                self.blob_service_client = None
         else:
             self.blob_service_client = None
     

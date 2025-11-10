@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Optional
 import os
@@ -7,7 +7,6 @@ from datetime import datetime
 from app.db.base import get_db
 from app.core.config import settings
 from app.services.import_service import ImportService
-from app.services.microsoft_graph_service import MicrosoftGraphService
 from app.services.azure_storage_service import AzureStorageService
 
 router = APIRouter()
@@ -93,37 +92,6 @@ async def upload_csv(
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
-
-@router.post("/microsoft-forms")
-async def import_from_microsoft_forms(
-    form_id: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Import enrollments from Microsoft Forms via Graph API."""
-    try:
-        graph_service = MicrosoftGraphService()
-        records = graph_service.get_form_responses(form_id)
-        
-        if not records:
-            return {
-                "message": "No new submissions found",
-                "results": {
-                    "total": 0,
-                    "processed": 0,
-                    "eligible": 0,
-                    "ineligible": 0,
-                    "errors": []
-                }
-            }
-        
-        results = ImportService.process_incoming_enrollments(db, records)
-        
-        return {
-            "message": "Microsoft Forms import completed",
-            "results": results
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error importing from Microsoft Forms: {str(e)}")
 
 @router.get("/sync-status")
 async def get_sync_status(db: Session = Depends(get_db)):

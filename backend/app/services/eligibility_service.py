@@ -39,14 +39,18 @@ class EligibilityService:
         Check if student is already enrolled in this course.
         Returns (is_eligible, reason_if_ineligible)
         """
+        # Check for any existing enrollment (including completed/withdrawn)
         existing_enrollment = db.query(Enrollment).filter(
             Enrollment.student_id == student_id,
-            Enrollment.course_id == course_id,
-            Enrollment.approval_status.in_(["Pending", "Approved"])
+            Enrollment.course_id == course_id
         ).first()
         
         if existing_enrollment:
             course = db.query(Course).filter(Course.id == course_id).first()
+            # If they completed it, mention that
+            if existing_enrollment.completion_status == "Completed":
+                return False, f"Already completed {course.name if course else 'this course'}"
+            # Otherwise just say already enrolled
             return False, f"Already enrolled in {course.name if course else 'this course'}"
         
         return True, None
