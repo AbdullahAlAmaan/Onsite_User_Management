@@ -12,11 +12,14 @@ import {
   ListItemText,
   TextField,
   MenuItem,
+  Tabs,
+  Tab,
 } from '@mui/material';
-import { UploadFile } from '@mui/icons-material';
-import { importsAPI, coursesAPI } from '../services/api';
+import { UploadFile, People, Assessment } from '@mui/icons-material';
+import { importsAPI, coursesAPI, completionsAPI } from '../services/api';
 
 function Imports() {
+  const [tabValue, setTabValue] = useState(0);
   const [file, setFile] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState('');
   const [courses, setCourses] = useState([]);
@@ -46,29 +49,6 @@ function Imports() {
     setResults(null);
   };
 
-  const handleExcelUpload = async () => {
-    if (!file) {
-      setMessage({ type: 'error', text: 'Please select a file' });
-      return;
-    }
-    if (!selectedCourse) {
-      setMessage({ type: 'error', text: 'Please select a course' });
-      return;
-    }
-
-    setLoading(true);
-    setMessage(null);
-    try {
-      const response = await importsAPI.uploadExcel(file, selectedCourse);
-      setResults(response.data.results);
-      setMessage({ type: 'success', text: response.data.message });
-      setFile(null);
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCSVUpload = async () => {
     if (!file) {
@@ -83,15 +63,63 @@ function Imports() {
     setLoading(true);
     setMessage(null);
     try {
-      const response = await importsAPI.uploadCSV(file, selectedCourse);
-      setResults(response.data.results);
-      setMessage({ type: 'success', text: response.data.message });
+      if (tabValue === 0) {
+        // Enrollment registration
+        const response = await importsAPI.uploadCSV(file, selectedCourse);
+        setResults(response.data.results);
+        setMessage({ type: 'success', text: response.data.message });
+      } else {
+        // Scores/Assessment
+        const response = await completionsAPI.upload(file, selectedCourse);
+        setResults(response.data.results);
+        setMessage({ type: 'success', text: response.data.message });
+      }
       setFile(null);
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExcelUpload = async () => {
+    if (!file) {
+      setMessage({ type: 'error', text: 'Please select a file' });
+      return;
+    }
+    if (!selectedCourse) {
+      setMessage({ type: 'error', text: 'Please select a course' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+    try {
+      if (tabValue === 0) {
+        // Enrollment registration
+        const response = await importsAPI.uploadExcel(file, selectedCourse);
+        setResults(response.data.results);
+        setMessage({ type: 'success', text: response.data.message });
+      } else {
+        // Scores/Assessment
+        const response = await completionsAPI.upload(file, selectedCourse);
+        setResults(response.data.results);
+        setMessage({ type: 'success', text: response.data.message });
+      }
+      setFile(null);
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+    setFile(null);
+    setResults(null);
+    setMessage(null);
+    setSelectedCourse('');
   };
 
   return (
@@ -108,12 +136,15 @@ function Imports() {
 
       <Card>
         <CardContent>
+          <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
+            <Tab icon={<People />} iconPosition="start" label="Enrollment Registrations" />
+            <Tab icon={<Assessment />} iconPosition="start" label="Scores & Assessment" />
+          </Tabs>
+
           <Typography variant="h6" gutterBottom>
-            Upload File
+            {tabValue === 0 ? 'Upload Enrollment Registration File' : 'Upload Scores & Assessment File'}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          </Typography>
-          <Box display="flex" flexDirection="column" gap={2}>
+          <Box display="flex" flexDirection="column" gap={2} sx={{ mt: 2 }}>
             {loadingCourses ? (
               <CircularProgress size={24} />
             ) : (
@@ -166,25 +197,43 @@ function Imports() {
               Import Results
             </Typography>
             <List>
-              <ListItem>
-                <ListItemText primary="Total Records" secondary={results.total} />
-              </ListItem>
-              <ListItem>
-                <ListItemText primary="Processed" secondary={results.processed} />
-              </ListItem>
-              <ListItem>
-                <ListItemText primary="Eligible" secondary={results.eligible} />
-              </ListItem>
-              <ListItem>
-                <ListItemText primary="Ineligible" secondary={results.ineligible} />
-              </ListItem>
-              {results.not_found !== undefined && results.not_found > 0 && (
-                <ListItem>
-                  <ListItemText
-                    primary="Not Found in Database"
-                    secondary={`${results.not_found} employees not found in database`}
-                  />
-                </ListItem>
+              {tabValue === 0 ? (
+                <>
+                  <ListItem>
+                    <ListItemText primary="Total Records" secondary={results.total} />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText primary="Processed" secondary={results.processed} />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText primary="Eligible" secondary={results.eligible} />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText primary="Ineligible" secondary={results.ineligible} />
+                  </ListItem>
+                  {results.not_found !== undefined && results.not_found > 0 && (
+                    <ListItem>
+                      <ListItemText
+                        primary="Not Found in Database"
+                        secondary={`${results.not_found} employees not found in database`}
+                      />
+                    </ListItem>
+                  )}
+                </>
+              ) : (
+                <>
+                  <ListItem>
+                    <ListItemText primary="Processed" secondary={results.processed} />
+                  </ListItem>
+                  {results.not_found !== undefined && results.not_found > 0 && (
+                    <ListItem>
+                      <ListItemText
+                        primary="Not Found"
+                        secondary={`${results.not_found} students not found or not enrolled`}
+                      />
+                    </ListItem>
+                  )}
+                </>
               )}
               {results.errors && results.errors.length > 0 && (
                 <ListItem>

@@ -23,11 +23,13 @@ import {
   CardContent,
   Alert,
 } from '@mui/material';
-import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove } from '@mui/icons-material';
+import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, Visibility } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { coursesAPI, enrollmentsAPI } from '../services/api';
+import UserDetailsDialog from '../components/UserDetailsDialog';
+import CourseDetailsDialog from '../components/CourseDetailsDialog';
 
 function Courses() {
   const [courses, setCourses] = useState([]);
@@ -40,6 +42,10 @@ function Courses() {
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
   const [withdrawalReason, setWithdrawalReason] = useState('');
   const [message, setMessage] = useState(null);
+  const [userDetailsOpen, setUserDetailsOpen] = useState(false);
+  const [selectedUserEnrollment, setSelectedUserEnrollment] = useState(null);
+  const [courseDetailsOpen, setCourseDetailsOpen] = useState(false);
+  const [selectedCourseEnrollment, setSelectedCourseEnrollment] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     batch_code: '',
@@ -167,6 +173,16 @@ function Courses() {
     setWithdrawalReason('');
   };
 
+  const handleViewUserDetails = (enrollment) => {
+    setSelectedUserEnrollment(enrollment);
+    setUserDetailsOpen(true);
+  };
+
+  const handleViewCourseDetails = (enrollment) => {
+    setSelectedCourseEnrollment(enrollment);
+    setCourseDetailsOpen(true);
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -260,8 +276,13 @@ function Courses() {
                                 </TableHead>
                                 <TableBody>
                                   {courseEnrollments[course.id].map((enrollment) => (
-                                    <TableRow key={enrollment.id}>
-                                      <TableCell>{enrollment.student_name}</TableCell>
+                                    <TableRow key={enrollment.id} hover>
+                                      <TableCell 
+                                        sx={{ cursor: 'pointer' }}
+                                        onClick={() => handleViewUserDetails(enrollment)}
+                                      >
+                                        {enrollment.student_name}
+                                      </TableCell>
                                       <TableCell>{enrollment.student_email}</TableCell>
                                       <TableCell>
                                         <Chip label={enrollment.student_sbu} size="small" />
@@ -287,16 +308,26 @@ function Courses() {
                                       <TableCell>{enrollment.completion_status}</TableCell>
                                       <TableCell>{enrollment.score || '-'}</TableCell>
                                       <TableCell>
-                                        {enrollment.approval_status === 'Approved' && (
+                                        <Box display="flex" gap={1}>
                                           <IconButton
                                             size="small"
-                                            color="error"
-                                            onClick={() => handleWithdraw(enrollment)}
-                                            title="Withdraw Student"
+                                            color="primary"
+                                            onClick={() => handleViewUserDetails(enrollment)}
+                                            title="View User Details"
                                           >
-                                            <PersonRemove />
+                                            <Visibility />
                                           </IconButton>
-                                        )}
+                                          {enrollment.approval_status === 'Approved' && (
+                                            <IconButton
+                                              size="small"
+                                              color="error"
+                                              onClick={() => handleWithdraw(enrollment)}
+                                              title="Withdraw Student"
+                                            >
+                                              <PersonRemove />
+                                            </IconButton>
+                                          )}
+                                        </Box>
                                       </TableCell>
                                     </TableRow>
                                   ))}
@@ -410,6 +441,27 @@ function Courses() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* User Details Dialog */}
+      <UserDetailsDialog
+        open={userDetailsOpen}
+        onClose={() => {
+          setUserDetailsOpen(false);
+          setSelectedUserEnrollment(null);
+        }}
+        enrollment={selectedUserEnrollment}
+        onViewCourseDetails={handleViewCourseDetails}
+      />
+
+      {/* Course Details Dialog */}
+      <CourseDetailsDialog
+        open={courseDetailsOpen}
+        onClose={() => {
+          setCourseDetailsOpen(false);
+          setSelectedCourseEnrollment(null);
+        }}
+        enrollment={selectedCourseEnrollment}
+      />
     </Box>
   );
 }

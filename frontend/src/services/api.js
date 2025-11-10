@@ -97,10 +97,10 @@ export const importsAPI = {
 };
 
 export const completionsAPI = {
-  upload: (file) => {
+  upload: (file, courseId) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/completions/upload', formData, {
+    return api.post(`/completions/upload?course_id=${courseId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

@@ -14,8 +14,10 @@ import {
   Alert,
   IconButton
 } from '@mui/material';
-import { PersonRemove } from '@mui/icons-material';
+import { PersonRemove, Visibility } from '@mui/icons-material';
 import { enrollmentsAPI } from '../services/api';
+import UserDetailsDialog from '../components/UserDetailsDialog';
+import CourseDetailsDialog from '../components/CourseDetailsDialog';
 
 function Enrollments() {
   const [enrollments, setEnrollments] = useState([]);
@@ -28,6 +30,10 @@ function Enrollments() {
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
   const [withdrawalReason, setWithdrawalReason] = useState('');
   const [message, setMessage] = useState(null);
+  const [userDetailsOpen, setUserDetailsOpen] = useState(false);
+  const [selectedUserEnrollment, setSelectedUserEnrollment] = useState(null);
+  const [courseDetailsOpen, setCourseDetailsOpen] = useState(false);
+  const [selectedCourseEnrollment, setSelectedCourseEnrollment] = useState(null);
 
   useEffect(() => {
     fetchEnrollments();
@@ -79,6 +85,16 @@ function Enrollments() {
     setWithdrawalReason('');
   };
 
+  const handleViewUserDetails = (enrollment) => {
+    setSelectedUserEnrollment(enrollment);
+    setUserDetailsOpen(true);
+  };
+
+  const handleViewCourseDetails = (enrollment) => {
+    setSelectedCourseEnrollment(enrollment);
+    setCourseDetailsOpen(true);
+  };
+
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
     { field: 'student_name', headerName: 'Student Name', width: 200 },
@@ -110,11 +126,19 @@ function Enrollments() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 180,
       sortable: false,
-      renderCell: (params) => {
-        if (params.row.approval_status === 'Approved') {
-          return (
+      renderCell: (params) => (
+        <Box display="flex" gap={1}>
+          <IconButton
+            size="small"
+            color="primary"
+            onClick={() => handleViewUserDetails(params.row)}
+            title="View User Details"
+          >
+            <Visibility />
+          </IconButton>
+          {params.row.approval_status === 'Approved' && (
             <IconButton
               size="small"
               color="error"
@@ -123,10 +147,9 @@ function Enrollments() {
             >
               <PersonRemove />
             </IconButton>
-          );
-        }
-        return null;
-      },
+          )}
+        </Box>
+      ),
     },
   ];
 
@@ -219,6 +242,27 @@ function Enrollments() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* User Details Dialog */}
+      <UserDetailsDialog
+        open={userDetailsOpen}
+        onClose={() => {
+          setUserDetailsOpen(false);
+          setSelectedUserEnrollment(null);
+        }}
+        enrollment={selectedUserEnrollment}
+        onViewCourseDetails={handleViewCourseDetails}
+      />
+
+      {/* Course Details Dialog */}
+      <CourseDetailsDialog
+        open={courseDetailsOpen}
+        onClose={() => {
+          setCourseDetailsOpen(false);
+          setSelectedCourseEnrollment(null);
+        }}
+        enrollment={selectedCourseEnrollment}
+      />
     </Box>
   );
 }
