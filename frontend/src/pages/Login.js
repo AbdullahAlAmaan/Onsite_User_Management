@@ -31,10 +31,17 @@ function Login() {
       // Store token
       localStorage.setItem('token', access_token);
       
-      // Redirect to dashboard
-      navigate('/dashboard');
+      // Redirect to enrollments
+      navigate('/enrollments');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed');
+      console.error('Login error:', err);
+      if (err.code === 'ECONNABORTED' || err.message === 'Network Error') {
+        setError('Connection timeout. Please check if the backend server is running.');
+      } else if (err.response) {
+        setError(err.response?.data?.detail || 'Login failed');
+      } else {
+        setError('Unable to connect to server. Please check your connection.');
+      }
     } finally {
       setLoading(false);
     }

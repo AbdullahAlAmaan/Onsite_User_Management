@@ -9,6 +9,7 @@ class CourseCreate(BaseModel):
     start_date: date
     end_date: Optional[date] = None
     seat_limit: int
+    total_classes_offered: Optional[int] = None
     prerequisite_course_id: Optional[int] = None
 
 class CourseUpdate(BaseModel):
@@ -17,6 +18,7 @@ class CourseUpdate(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     seat_limit: Optional[int] = None
+    total_classes_offered: Optional[int] = None
     prerequisite_course_id: Optional[int] = None
 
 class CourseResponse(BaseModel):
@@ -28,6 +30,7 @@ class CourseResponse(BaseModel):
     end_date: Optional[date]
     seat_limit: int
     current_enrolled: int
+    total_classes_offered: Optional[int]
     prerequisite_course_id: Optional[int]
     is_archived: bool
     created_at: datetime

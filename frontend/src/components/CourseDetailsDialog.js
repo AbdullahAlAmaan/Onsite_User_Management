@@ -47,6 +47,17 @@ function CourseDetailsDialog({ open, onClose, enrollment }) {
             </Typography>
           </Grid>
           
+          {enrollment.course_description && (
+            <Grid item xs={12}>
+              <Typography variant="body2" color="text.secondary">
+                Description
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                {enrollment.course_description}
+              </Typography>
+            </Grid>
+          )}
+          
           {enrollment.course_start_date && (
             <Grid item xs={12} sm={6}>
               <Typography variant="body2" color="text.secondary">

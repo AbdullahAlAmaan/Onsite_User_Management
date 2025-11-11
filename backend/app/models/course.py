@@ -14,6 +14,7 @@ class Course(Base):
     end_date = Column(Date, nullable=True)
     seat_limit = Column(Integer, nullable=False, default=0)
     current_enrolled = Column(Integer, default=0)
+    total_classes_offered = Column(Integer, nullable=True)
     prerequisite_course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
     is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -4,11 +4,9 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
 import Enrollments from './pages/Enrollments';
 import Courses from './pages/Courses';
-import InstructorDashboard from './pages/InstructorDashboard';
-import Imports from './pages/Imports';
+import Users from './pages/Users';
 import PrivateRoute from './components/PrivateRoute';
 
 const theme = createTheme({
@@ -29,12 +27,10 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<PrivateRoute><Layout><Navigate to="/dashboard" replace /></Layout></PrivateRoute>} />
-          <Route path="/dashboard" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
+          <Route path="/" element={<PrivateRoute><Layout><Navigate to="/enrollments" replace /></Layout></PrivateRoute>} />
           <Route path="/enrollments" element={<PrivateRoute><Layout><Enrollments /></Layout></PrivateRoute>} />
           <Route path="/courses" element={<PrivateRoute><Layout><Courses /></Layout></PrivateRoute>} />
-          <Route path="/instructor" element={<PrivateRoute><Layout><InstructorDashboard /></Layout></PrivateRoute>} />
-          <Route path="/imports" element={<PrivateRoute><Layout><Imports /></Layout></PrivateRoute>} />
+          <Route path="/users" element={<PrivateRoute><Layout><Users /></Layout></PrivateRoute>} />
         </Routes>
       </Router>
     </ThemeProvider>

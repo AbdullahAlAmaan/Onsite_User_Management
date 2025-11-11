@@ -69,6 +69,9 @@ class Enrollment(Base):
     completion_status = Column(Enum(CompletionStatus), default=CompletionStatus.NOT_STARTED, nullable=False)
     score = Column(Float, nullable=True)
     attendance_percentage = Column(Float, nullable=True)
+    total_attendance = Column(Integer, nullable=True)  # Total attendance sessions
+    present = Column(Integer, nullable=True)  # Number of sessions present
+    attendance_status = Column(String, nullable=True)  # Status like "5/10" or "Present/Total"
     completion_date = Column(DateTime, nullable=True)
     
     # Audit

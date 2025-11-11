@@ -67,9 +67,69 @@ def get_student_enrollments(student_id: int, db: Session = Depends(get_db)):
         enrollment_dict['student_experience_years'] = enrollment.student.experience_years
         enrollment_dict['course_name'] = enrollment.course.name
         enrollment_dict['batch_code'] = enrollment.course.batch_code
+        enrollment_dict['attendance_percentage'] = enrollment.attendance_percentage
+        enrollment_dict['total_attendance'] = enrollment.total_attendance
+        enrollment_dict['present'] = enrollment.present
+        enrollment_dict['attendance_status'] = enrollment.attendance_status
         enrollment_dict['course_start_date'] = enrollment.course.start_date.isoformat() if enrollment.course.start_date else None
         enrollment_dict['course_end_date'] = enrollment.course.end_date.isoformat() if enrollment.course.end_date else None
+        enrollment_dict['completion_date'] = enrollment.completion_date.isoformat() if enrollment.completion_date else None
         result.append(enrollment_dict)
+    
+    return result
+
+@router.get("/all/with-courses", response_model=List[dict])
+def get_all_students_with_courses(
+    sbu: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(1000, ge=1, le=10000),
+    db: Session = Depends(get_db)
+):
+    """Get all students with their complete course history and attendance data."""
+    from app.models.enrollment import Enrollment, CompletionStatus
+    from sqlalchemy.orm import joinedload
+    
+    query = db.query(Student)
+    
+    if sbu:
+        query = query.filter(Student.sbu == sbu)
+    
+    students = query.offset(skip).limit(limit).all()
+    
+    result = []
+    for student in students:
+        enrollments = db.query(Enrollment).options(joinedload(Enrollment.course)).filter(Enrollment.student_id == student.id).order_by(Enrollment.created_at.desc()).all()
+        
+        student_dict = StudentResponse.from_orm(student).dict()
+        student_dict['enrollments'] = []
+        student_dict['total_courses'] = len(enrollments)
+        student_dict['completed_courses'] = len([e for e in enrollments if e.completion_status == CompletionStatus.COMPLETED])
+        student_dict['never_taken_course'] = len(enrollments) == 0
+        
+        for enrollment in enrollments:
+            # Ensure course relationship is loaded
+            if not enrollment.course:
+                continue  # Skip enrollments without a course
+            
+            enrollment_dict = {
+                'id': enrollment.id,
+                'course_name': enrollment.course.name if enrollment.course else None,
+                'batch_code': enrollment.course.batch_code if enrollment.course else None,
+                'approval_status': enrollment.approval_status.value if enrollment.approval_status else None,
+                'completion_status': enrollment.completion_status.value if enrollment.completion_status else None,
+                'eligibility_status': enrollment.eligibility_status.value if enrollment.eligibility_status else None,
+                'score': enrollment.score,
+                'attendance_percentage': enrollment.attendance_percentage,
+                'total_attendance': enrollment.total_attendance,
+                'present': enrollment.present,
+                'attendance_status': enrollment.attendance_status,
+                'course_start_date': enrollment.course.start_date.isoformat() if enrollment.course and enrollment.course.start_date else None,
+                'course_end_date': enrollment.course.end_date.isoformat() if enrollment.course and enrollment.course.end_date else None,
+                'created_at': enrollment.created_at.isoformat() if enrollment.created_at else None,
+            }
+            student_dict['enrollments'].append(enrollment_dict)
+        
+        result.append(student_dict)
     
     return result
 

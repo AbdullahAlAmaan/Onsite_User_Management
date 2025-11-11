@@ -5,8 +5,9 @@ from datetime import datetime
 from app.db.base import get_db
 from app.models.enrollment import Enrollment, ApprovalStatus
 from app.models.course import Course
-from app.schemas.enrollment import EnrollmentResponse, EnrollmentApproval, EnrollmentBulkApproval
+from app.schemas.enrollment import EnrollmentResponse, EnrollmentApproval, EnrollmentBulkApproval, EnrollmentCreate
 from app.services.eligibility_service import EligibilityService
+from app.models.enrollment import EligibilityStatus
 
 router = APIRouter()
 
@@ -38,7 +39,8 @@ def get_enrollments(
     
     enrollments = query.offset(skip).limit(limit).all()
     
-    # Enrich with related data
+    # Enrich with related data and calculate overall completion rate
+    from app.models.enrollment import CompletionStatus
     result = []
     for enrollment in enrollments:
         enrollment_dict = EnrollmentResponse.from_orm(enrollment).dict()
@@ -50,6 +52,26 @@ def get_enrollments(
         enrollment_dict['student_experience_years'] = enrollment.student.experience_years
         enrollment_dict['course_name'] = enrollment.course.name
         enrollment_dict['batch_code'] = enrollment.course.batch_code
+        enrollment_dict['course_description'] = enrollment.course.description
+        
+        # Calculate overall completion rate for this student across all courses
+        all_student_enrollments = db.query(Enrollment).filter(
+            Enrollment.student_id == enrollment.student_id
+        ).all()
+        
+        total_courses = len(all_student_enrollments)
+        completed_courses = sum(1 for e in all_student_enrollments if e.completion_status == CompletionStatus.COMPLETED)
+        
+        if total_courses > 0:
+            overall_completion_rate = (completed_courses / total_courses) * 100
+        else:
+            overall_completion_rate = 0.0
+        
+        enrollment_dict['overall_completion_rate'] = round(overall_completion_rate, 1)
+        enrollment_dict['total_courses_assigned'] = total_courses
+        enrollment_dict['completed_courses'] = completed_courses
+        
+        # Create response with all fields
         result.append(EnrollmentResponse(**enrollment_dict))
     
     return result
@@ -85,6 +107,7 @@ def get_eligible_enrollments(
         enrollment_dict['student_experience_years'] = enrollment.student.experience_years
         enrollment_dict['course_name'] = enrollment.course.name
         enrollment_dict['batch_code'] = enrollment.course.batch_code
+        enrollment_dict['course_description'] = enrollment.course.description
         result.append(EnrollmentResponse(**enrollment_dict))
     
     return result
@@ -134,6 +157,7 @@ def approve_enrollment(
     enrollment_dict['student_experience_years'] = enrollment.student.experience_years
     enrollment_dict['course_name'] = enrollment.course.name
     enrollment_dict['batch_code'] = enrollment.course.batch_code
+    enrollment_dict['course_description'] = enrollment.course.description
     
     return EnrollmentResponse(**enrollment_dict)
 
@@ -234,6 +258,142 @@ def withdraw_enrollment(
     enrollment_dict['student_experience_years'] = enrollment.student.experience_years
     enrollment_dict['course_name'] = enrollment.course.name
     enrollment_dict['batch_code'] = enrollment.course.batch_code
+    enrollment_dict['course_description'] = enrollment.course.description
+    
+    return EnrollmentResponse(**enrollment_dict)
+
+@router.post("/{enrollment_id}/reapprove", response_model=EnrollmentResponse)
+def reapprove_enrollment(
+    enrollment_id: int,
+    approved_by: str = Query(..., description="Admin name"),
+    db: Session = Depends(get_db)
+):
+    """Reapprove a previously withdrawn enrollment."""
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    
+    # Only allow reapproval if withdrawn
+    if enrollment.approval_status != ApprovalStatus.WITHDRAWN:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot reapprove enrollment with status: {enrollment.approval_status}. Only withdrawn enrollments can be reapproved."
+        )
+    
+    # Check eligibility
+    if enrollment.eligibility_status != "Eligible":
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot reapprove enrollment with eligibility status: {enrollment.eligibility_status}"
+        )
+    
+    # Check seat availability
+    course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+    if course.current_enrolled >= course.seat_limit:
+        raise HTTPException(status_code=400, detail="No available seats")
+    
+    # Reapprove enrollment
+    enrollment.approval_status = ApprovalStatus.APPROVED
+    enrollment.approved_by = approved_by
+    enrollment.approved_at = datetime.utcnow()
+    enrollment.rejection_reason = None  # Clear withdrawal reason
+    
+    # Update seat count
+    course.current_enrolled += 1
+    
+    db.commit()
+    db.refresh(enrollment)
+    
+    enrollment_dict = EnrollmentResponse.from_orm(enrollment).dict()
+    enrollment_dict['student_name'] = enrollment.student.name
+    enrollment_dict['student_email'] = enrollment.student.email
+    enrollment_dict['student_sbu'] = enrollment.student.sbu.value
+    enrollment_dict['student_employee_id'] = enrollment.student.employee_id
+    enrollment_dict['student_designation'] = enrollment.student.designation
+    enrollment_dict['student_experience_years'] = enrollment.student.experience_years
+    enrollment_dict['course_name'] = enrollment.course.name
+    enrollment_dict['batch_code'] = enrollment.course.batch_code
+    enrollment_dict['course_description'] = enrollment.course.description
+    
+    return EnrollmentResponse(**enrollment_dict)
+
+@router.post("/", response_model=EnrollmentResponse, status_code=201)
+def create_enrollment(
+    enrollment_data: EnrollmentCreate,
+    db: Session = Depends(get_db)
+):
+    """Manually create a new enrollment for a student in a course."""
+    from app.models.student import Student
+    
+    # Check if student exists
+    student = db.query(Student).filter(Student.id == enrollment_data.student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Check if course exists
+    course = db.query(Course).filter(Course.id == enrollment_data.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Check if enrollment already exists
+    existing = db.query(Enrollment).filter(
+        Enrollment.student_id == enrollment_data.student_id,
+        Enrollment.course_id == enrollment_data.course_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Enrollment already exists for {student.name} in {course.name}")
+    
+    # Run eligibility checks
+    eligibility_status, reason = EligibilityService.run_all_checks(
+        db, enrollment_data.student_id, enrollment_data.course_id
+    )
+    
+    # For manual enrollment, auto-approve if eligible
+    if eligibility_status == EligibilityStatus.ELIGIBLE:
+        # Check seat availability before auto-approving
+        if course.current_enrolled >= course.seat_limit:
+            raise HTTPException(status_code=400, detail="No available seats in this course")
+        
+        # Auto-approve manual enrollment
+        approval_status = ApprovalStatus.APPROVED
+        approved_by = "Admin (Manual Enrollment)"
+        approved_at = datetime.utcnow()
+        
+        # Update seat count
+        course.current_enrolled += 1
+    else:
+        # Not eligible, set to rejected
+        approval_status = ApprovalStatus.REJECTED
+        approved_by = None
+        approved_at = None
+    
+    # Create enrollment
+    enrollment = Enrollment(
+        student_id=enrollment_data.student_id,
+        course_id=enrollment_data.course_id,
+        eligibility_status=eligibility_status,
+        eligibility_reason=reason,
+        eligibility_checked_at=datetime.utcnow(),
+        approval_status=approval_status,
+        approved_by=approved_by,
+        approved_at=approved_at
+    )
+    
+    db.add(enrollment)
+    db.commit()
+    db.refresh(enrollment)
+    
+    enrollment_dict = EnrollmentResponse.from_orm(enrollment).dict()
+    enrollment_dict['student_name'] = enrollment.student.name
+    enrollment_dict['student_email'] = enrollment.student.email
+    enrollment_dict['student_sbu'] = enrollment.student.sbu.value
+    enrollment_dict['student_employee_id'] = enrollment.student.employee_id
+    enrollment_dict['student_designation'] = enrollment.student.designation
+    enrollment_dict['student_experience_years'] = enrollment.student.experience_years
+    enrollment_dict['course_name'] = enrollment.course.name
+    enrollment_dict['batch_code'] = enrollment.course.batch_code
+    enrollment_dict['course_description'] = enrollment.course.description
     
     return EnrollmentResponse(**enrollment_dict)
 
@@ -253,6 +413,7 @@ def get_enrollment(enrollment_id: int, db: Session = Depends(get_db)):
     enrollment_dict['student_experience_years'] = enrollment.student.experience_years
     enrollment_dict['course_name'] = enrollment.course.name
     enrollment_dict['batch_code'] = enrollment.course.batch_code
+    enrollment_dict['course_description'] = enrollment.course.description
     
     return EnrollmentResponse(**enrollment_dict)
 

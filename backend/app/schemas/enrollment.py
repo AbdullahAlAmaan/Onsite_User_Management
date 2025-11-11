@@ -17,6 +17,9 @@ class EnrollmentResponse(BaseModel):
     completion_status: CompletionStatus
     score: Optional[float]
     attendance_percentage: Optional[float]
+    total_attendance: Optional[int]
+    present: Optional[int]
+    attendance_status: Optional[str]
     completion_date: Optional[datetime]
     created_at: datetime
     updated_at: datetime
@@ -30,6 +33,10 @@ class EnrollmentResponse(BaseModel):
     student_experience_years: Optional[int] = None
     course_name: Optional[str] = None
     batch_code: Optional[str] = None
+    course_description: Optional[str] = None
+    overall_completion_rate: Optional[float] = None
+    total_courses_assigned: Optional[int] = None
+    completed_courses: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -42,6 +49,10 @@ class EnrollmentApproval(BaseModel):
 class EnrollmentBulkApproval(BaseModel):
     enrollment_ids: List[int]
     approved: bool
+
+class EnrollmentCreate(BaseModel):
+    student_id: int
+    course_id: int
 
 class CompletionUpload(BaseModel):
     enrollment_id: int

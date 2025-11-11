@@ -11,51 +11,54 @@ import {
   Divider,
   Box,
   CircularProgress,
-  Alert,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
+  Card,
+  CardContent,
+  useTheme,
+  alpha,
 } from '@mui/material';
-import { Visibility } from '@mui/icons-material';
 import { studentsAPI } from '../services/api';
 
-function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onApprove, onReject }) {
+function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onApprove, onReject, onReapprove }) {
+  const theme = useTheme();
   const [studentEnrollments, setStudentEnrollments] = useState([]);
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
 
-  useEffect(() => {
-    if (open && enrollment?.student_id) {
-      fetchStudentEnrollments();
-    } else {
-      setStudentEnrollments([]);
-    }
-  }, [open, enrollment]);
-
   const fetchStudentEnrollments = async () => {
-    if (!enrollment?.student_id) return;
+    if (!enrollment?.student_id) {
+      console.log('UserDetailsDialog: No student_id in enrollment:', enrollment);
+      return;
+    }
     
     setLoadingEnrollments(true);
     try {
+      console.log('UserDetailsDialog: Fetching enrollments for student_id:', enrollment.student_id);
       const response = await studentsAPI.getEnrollments(enrollment.student_id);
-      setStudentEnrollments(response.data);
+      console.log('UserDetailsDialog: Received enrollments:', response.data);
+      setStudentEnrollments(response.data || []);
     } catch (error) {
-      console.error('Error fetching student enrollments:', error);
+      console.error('UserDetailsDialog: Error fetching student enrollments:', error);
       setStudentEnrollments([]);
     } finally {
       setLoadingEnrollments(false);
     }
   };
 
+  useEffect(() => {
+    console.log('UserDetailsDialog: useEffect triggered, open:', open, 'enrollment:', enrollment);
+    if (open && enrollment?.student_id) {
+      fetchStudentEnrollments();
+    } else {
+      setStudentEnrollments([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, enrollment?.student_id]);
+
   if (!enrollment) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        User Details - {enrollment.student_name}
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+      <DialogTitle sx={{ fontWeight: 600, fontSize: '1.25rem' }}>
+        Complete User Profile - {enrollment.student_name}
       </DialogTitle>
       <DialogContent>
         <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -121,8 +124,15 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
           </Grid>
           
           <Grid item xs={12} sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Course History
+            <Typography 
+              variant="h6" 
+              gutterBottom
+              sx={{ 
+                mb: 2,
+                fontWeight: 600,
+              }}
+            >
+              Complete Course History
             </Typography>
             <Divider sx={{ mb: 2 }} />
             {loadingEnrollments ? (
@@ -130,74 +140,150 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
                 <CircularProgress size={24} />
               </Box>
             ) : studentEnrollments.length > 0 ? (
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Course</TableCell>
-                      <TableCell>Batch</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Completion</TableCell>
-                      <TableCell>Score</TableCell>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {studentEnrollments.map((enrollment) => (
-                      <TableRow key={enrollment.id} hover>
-                        <TableCell>{enrollment.course_name}</TableCell>
-                        <TableCell>{enrollment.batch_code}</TableCell>
-                        <TableCell>
+              <Box display="flex" flexDirection="column" gap={2}>
+                {studentEnrollments.map((enroll) => {
+                  const isCompleted = enroll.completion_status === 'Completed';
+                  const isFailed = enroll.completion_status === 'Failed';
+                  const isInProgress = enroll.completion_status === 'In Progress';
+                  const statusColor = isCompleted ? 'success' : isFailed ? 'error' : isInProgress ? 'warning' : 'default';
+                  
+                  return (
+                    <Card
+                      key={enroll.id}
+                      sx={{
+                        borderLeft: `4px solid ${
+                          isCompleted ? theme.palette.success.main :
+                          isFailed ? theme.palette.error.main :
+                          isInProgress ? theme.palette.warning.main :
+                          theme.palette.grey[400]
+                        }`,
+                        backgroundColor: isCompleted 
+                          ? alpha(theme.palette.success.main, 0.05)
+                          : isFailed
+                          ? alpha(theme.palette.error.main, 0.05)
+                          : alpha(theme.palette.primary.main, 0.02),
+                        borderRadius: 2,
+                        boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.1)}`,
+                      }}
+                    >
+                      <CardContent>
+                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                          <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                              {enroll.course_name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Batch: {enroll.batch_code}
+                            </Typography>
+                          </Box>
                           <Chip
-                            label={enrollment.approval_status}
-                            color={
-                              enrollment.approval_status === 'Approved' ? 'success' :
-                              enrollment.approval_status === 'Pending' ? 'warning' :
-                              enrollment.approval_status === 'Rejected' ? 'error' :
-                              enrollment.approval_status === 'Withdrawn' ? 'error' : 'default'
-                            }
+                            label={enroll.completion_status}
+                            color={statusColor}
                             size="small"
+                            sx={{ fontWeight: 600 }}
                           />
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={enrollment.completion_status}
-                            color={
-                              enrollment.completion_status === 'Completed' ? 'success' :
-                              enrollment.completion_status === 'In Progress' ? 'info' :
-                              enrollment.completion_status === 'Failed' ? 'error' : 'default'
-                            }
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {enrollment.score !== null ? `${enrollment.score}%` : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {enrollment.completion_date 
-                            ? new Date(enrollment.completion_date).toLocaleDateString()
-                            : enrollment.created_at 
-                            ? new Date(enrollment.created_at).toLocaleDateString()
-                            : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {onViewCourseDetails && (
-                            <Button
+                        </Box>
+                        
+                        <Box display="flex" gap={3} mt={2} flexWrap="wrap">
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Approval Status
+                            </Typography>
+                            <Chip
+                              label={enroll.approval_status}
+                              color={
+                                enroll.approval_status === 'Approved' ? 'success' :
+                                enroll.approval_status === 'Pending' ? 'warning' :
+                                enroll.approval_status === 'Withdrawn' ? 'error' :
+                                enroll.approval_status === 'Rejected' ? 'error' : 'default'
+                              }
                               size="small"
-                              variant="outlined"
-                              startIcon={<Visibility />}
-                              onClick={() => onViewCourseDetails(enrollment)}
-                            >
-                              Details
-                            </Button>
+                              sx={{ mt: 0.5 }}
+                            />
+                          </Box>
+                          
+                          {enroll.score !== null && enroll.score !== undefined && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                Score
+                              </Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 500, mt: 0.5 }}>
+                                {enroll.score.toFixed(1)}
+                              </Typography>
+                            </Box>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                          
+                          {enroll.attendance_percentage !== null && enroll.attendance_percentage !== undefined && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                Attendance
+                              </Typography>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontWeight: 600, 
+                                  mt: 0.5,
+                                  color: enroll.attendance_percentage >= 80 
+                                    ? theme.palette.success.main 
+                                    : enroll.attendance_percentage >= 50
+                                    ? theme.palette.warning.main
+                                    : theme.palette.error.main
+                                }}
+                              >
+                                {enroll.attendance_percentage.toFixed(1)}%
+                              </Typography>
+                            </Box>
+                          )}
+                          
+                          {enroll.attendance_status && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                Attendance Details
+                              </Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 500, mt: 0.5 }}>
+                                {enroll.attendance_status}
+                              </Typography>
+                            </Box>
+                          )}
+                          
+                          {enroll.present !== null && enroll.total_attendance !== null && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                Sessions
+                              </Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 500, mt: 0.5 }}>
+                                {enroll.present} / {enroll.total_attendance}
+                              </Typography>
+                            </Box>
+                          )}
+                          
+                          {enroll.course_start_date && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                Start Date
+                              </Typography>
+                              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                {new Date(enroll.course_start_date).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                          )}
+                          
+                          {enroll.completion_date && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                Completion Date
+                              </Typography>
+                              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                {new Date(enroll.completion_date).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </Box>
             ) : (
               <Typography variant="body2" color="text.secondary">
                 No course history available.
@@ -208,7 +294,7 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
-        {enrollment && enrollment.eligibility_status === 'Eligible' && onApprove && onReject && (
+        {enrollment && enrollment.approval_status === 'Pending' && enrollment.eligibility_status === 'Eligible' && onApprove && onReject && (
           <>
             <Button
               color="success"
@@ -231,6 +317,18 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
               Reject
             </Button>
           </>
+        )}
+        {enrollment && enrollment.approval_status === 'Withdrawn' && onReapprove && (
+          <Button
+            color="primary"
+            variant="contained"
+            onClick={() => {
+              onReapprove(enrollment.id);
+              onClose();
+            }}
+          >
+            Reapprove
+          </Button>
         )}
       </DialogActions>
     </Dialog>

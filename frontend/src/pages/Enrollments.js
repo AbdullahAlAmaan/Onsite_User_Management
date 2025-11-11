@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { DataGrid } from '@mui/x-data-grid';
 import { 
   Box, 
   Typography, 
@@ -17,9 +16,17 @@ import {
   CardContent,
   useTheme,
   alpha,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
-import { PersonRemove, Visibility } from '@mui/icons-material';
-import { enrollmentsAPI } from '../services/api';
+import { PersonRemove, CheckCircle, Cancel, Refresh, PersonAdd } from '@mui/icons-material';
+import { enrollmentsAPI, coursesAPI, studentsAPI } from '../services/api';
 import UserDetailsDialog from '../components/UserDetailsDialog';
 import CourseDetailsDialog from '../components/CourseDetailsDialog';
 
@@ -27,9 +34,12 @@ function Enrollments() {
   const theme = useTheme();
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState([]);
+  const [students, setStudents] = useState([]);
   const [filters, setFilters] = useState({
     eligibility_status: '',
-    approval_status: '',
+    approval_status: 'Pending', // Default to show only pending approvals
+    course_id: '',
   });
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
@@ -39,24 +49,97 @@ function Enrollments() {
   const [selectedUserEnrollment, setSelectedUserEnrollment] = useState(null);
   const [courseDetailsOpen, setCourseDetailsOpen] = useState(false);
   const [selectedCourseEnrollment, setSelectedCourseEnrollment] = useState(null);
+  const [manualEnrollDialogOpen, setManualEnrollDialogOpen] = useState(false);
+  const [manualEnrollData, setManualEnrollData] = useState({
+    student_id: '',
+    course_id: '',
+  });
+
+  useEffect(() => {
+    fetchCourses();
+    fetchStudents();
+    fetchEnrollments();
+  }, []);
 
   useEffect(() => {
     fetchEnrollments();
   }, [filters]);
 
+  const fetchCourses = async () => {
+    try {
+      const response = await coursesAPI.getAll({ archived: false });
+      setCourses(response.data);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const response = await studentsAPI.getAll({ limit: 1000 });
+      setStudents(response.data);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  };
+
   const fetchEnrollments = async () => {
     setLoading(true);
     try {
       const params = {};
-      if (filters.eligibility_status) params.eligibility_status = filters.eligibility_status;
+      // Handle "Not Eligible" filter on frontend since backend expects specific status values
+      if (filters.eligibility_status && filters.eligibility_status !== 'Not Eligible') {
+        params.eligibility_status = filters.eligibility_status;
+      }
       if (filters.approval_status) params.approval_status = filters.approval_status;
+      if (filters.course_id) params.course_id = filters.course_id;
       
       const response = await enrollmentsAPI.getAll(params);
-      setEnrollments(response.data);
+      let filteredEnrollments = response.data;
+      
+      // Filter for "Not Eligible" on frontend if selected
+      if (filters.eligibility_status === 'Not Eligible') {
+        filteredEnrollments = filteredEnrollments.filter(e => e.eligibility_status !== 'Eligible');
+      }
+      
+      setEnrollments(filteredEnrollments);
     } catch (error) {
       console.error('Error fetching enrollments:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApprove = async (id) => {
+    try {
+      await enrollmentsAPI.approve({ enrollment_id: id, approved: true }, 'Admin');
+      setMessage({ type: 'success', text: 'Enrollment approved successfully' });
+      fetchEnrollments();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error approving enrollment' });
+    }
+  };
+
+  const handleReject = async (id) => {
+    try {
+      await enrollmentsAPI.approve(
+        { enrollment_id: id, approved: false, rejection_reason: 'Rejected by admin' },
+        'Admin'
+      );
+      setMessage({ type: 'success', text: 'Enrollment rejected' });
+      fetchEnrollments();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error rejecting enrollment' });
+    }
+  };
+
+  const handleReapprove = async (id) => {
+    try {
+      await enrollmentsAPI.reapprove(id, 'Admin');
+      setMessage({ type: 'success', text: 'Enrollment reapproved successfully' });
+      fetchEnrollments();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error reapproving enrollment' });
     }
   };
 
@@ -100,83 +183,75 @@ function Enrollments() {
     setCourseDetailsOpen(true);
   };
 
-  const columns = [
-    { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'student_name', headerName: 'Student Name', width: 200 },
-    { field: 'student_email', headerName: 'Email', width: 250 },
-    { field: 'student_sbu', headerName: 'SBU', width: 120 },
-    { field: 'course_name', headerName: 'Course', width: 200 },
-    { field: 'batch_code', headerName: 'Batch', width: 150 },
-    { 
-      field: 'eligibility_status', 
-      headerName: 'Eligibility', 
-      width: 180,
-      renderCell: (params) => (
-        <span style={{ 
-          color: params.value === 'Eligible' ? 'green' : 'red',
-          fontWeight: params.value === 'Eligible' ? 'bold' : 'normal'
-        }}>
-          {params.value}
-        </span>
-      )
-    },
-    { 
-      field: 'eligibility_reason', 
-      headerName: 'Reason', 
-      width: 250,
-      renderCell: (params) => params.value || '-'
-    },
-    { field: 'approval_status', headerName: 'Approval', width: 130 },
-    { field: 'completion_status', headerName: 'Completion', width: 130 },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 180,
-      sortable: false,
-      renderCell: (params) => (
-        <Box display="flex" gap={1}>
-          <IconButton
-            size="small"
-            color="primary"
-            onClick={() => handleViewUserDetails(params.row)}
-            title="View User Details"
-          >
-            <Visibility />
-          </IconButton>
-          {params.row.approval_status === 'Approved' && (
-            <IconButton
-              size="small"
-              color="error"
-              onClick={() => handleWithdraw(params.row)}
-              title="Withdraw Student"
-            >
-              <PersonRemove />
-            </IconButton>
-          )}
-        </Box>
-      ),
-    },
-  ];
+  const handleManualEnroll = () => {
+    setManualEnrollData({ student_id: '', course_id: '' });
+    setManualEnrollDialogOpen(true);
+  };
+
+  const handleManualEnrollConfirm = async () => {
+    if (!manualEnrollData.student_id || !manualEnrollData.course_id) {
+      setMessage({ type: 'error', text: 'Please select both student and course' });
+      return;
+    }
+
+    try {
+      await enrollmentsAPI.create({
+        student_id: parseInt(manualEnrollData.student_id),
+        course_id: parseInt(manualEnrollData.course_id),
+      });
+      setMessage({ type: 'success', text: 'Student enrolled and automatically approved successfully' });
+      setManualEnrollDialogOpen(false);
+      setManualEnrollData({ student_id: '', course_id: '' });
+      fetchEnrollments();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error creating enrollment' });
+    }
+  };
+
+  const handleManualEnrollCancel = () => {
+    setManualEnrollDialogOpen(false);
+    setManualEnrollData({ student_id: '', course_id: '' });
+  };
 
   return (
     <Box>
-      <Box mb={4}>
-        <Typography 
-          variant="h4" 
-          gutterBottom
-          sx={{ 
-            fontWeight: 600,
-            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-          }}
-        >
-          Enrollments Management
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          View and manage all course enrollments
-        </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Box>
+          <Typography 
+            variant="h4" 
+            gutterBottom
+            sx={{ 
+              fontWeight: 600,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
+            Enrollments & Approvals
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            View, manage, and approve all course enrollments
+          </Typography>
+        </Box>
+        <Box display="flex" gap={2}>
+          <Button
+            variant="contained"
+            startIcon={<PersonAdd />}
+            onClick={handleManualEnroll}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500,
+              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+              '&:hover': {
+                boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
+              },
+            }}
+          >
+            Manual Enrollment
+          </Button>
+        </Box>
       </Box>
 
       {message && (
@@ -202,7 +277,22 @@ function Enrollments() {
         }}
       >
         <CardContent>
-          <Box display="flex" gap={2} flexWrap="wrap">
+          <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+            <TextField
+              select
+              label="Course"
+              value={filters.course_id}
+              onChange={(e) => setFilters({ ...filters, course_id: e.target.value })}
+              sx={{ minWidth: 200 }}
+              variant="outlined"
+            >
+              <MenuItem value="">All Courses</MenuItem>
+              {courses.map((course) => (
+                <MenuItem key={course.id} value={course.id}>
+                  {course.name} - {course.batch_code}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               select
               label="Eligibility Status"
@@ -213,9 +303,7 @@ function Enrollments() {
             >
               <MenuItem value="">All</MenuItem>
               <MenuItem value="Eligible">Eligible</MenuItem>
-              <MenuItem value="Ineligible (Missing Prerequisite)">Missing Prerequisite</MenuItem>
-              <MenuItem value="Ineligible (Already Taken)">Already Taken</MenuItem>
-              <MenuItem value="Ineligible (Annual Limit)">Annual Limit</MenuItem>
+              <MenuItem value="Not Eligible">Not Eligible</MenuItem>
             </TextField>
             <TextField
               select
@@ -229,6 +317,7 @@ function Enrollments() {
               <MenuItem value="Pending">Pending</MenuItem>
               <MenuItem value="Approved">Approved</MenuItem>
               <MenuItem value="Rejected">Rejected</MenuItem>
+              <MenuItem value="Withdrawn">Withdrawn</MenuItem>
             </TextField>
           </Box>
         </CardContent>
@@ -239,34 +328,370 @@ function Enrollments() {
           <CircularProgress />
         </Box>
       ) : (
-        <Card
-          sx={{
-            borderRadius: 3,
-            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-            overflow: 'hidden',
-          }}
-        >
-          <Box sx={{ height: 600, width: '100%' }}>
-            <DataGrid
-              rows={enrollments}
-              columns={columns}
-              pageSize={10}
-              rowsPerPageOptions={[10, 25, 50]}
-              disableSelectionOnClick
+        <Box display="flex" flexDirection="column" gap={3}>
+          {/* Eligible Enrollments Section */}
+          {enrollments.filter(e => e.eligibility_status === 'Eligible').length > 0 && (
+            <Card
               sx={{
-                border: 'none',
-                '& .MuiDataGrid-cell': {
-                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                },
-                '& .MuiDataGrid-columnHeaders': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                },
+                borderRadius: 3,
+                boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                overflow: 'hidden',
               }}
-            />
-          </Box>
-        </Card>
+            >
+              <CardContent>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{ 
+                    mb: 2,
+                    color: theme.palette.success.main,
+                    fontWeight: 600,
+                  }}
+                >
+                  Eligible Enrollments ({enrollments.filter(e => e.eligibility_status === 'Eligible').length})
+                </Typography>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: alpha(theme.palette.success.main, 0.1) }}>
+                        <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Course</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Batch</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Approval</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {enrollments
+                        .filter(enrollment => enrollment.eligibility_status === 'Eligible')
+                        .map((enrollment) => (
+                          <TableRow key={enrollment.id} hover>
+                            <TableCell>
+                              <Typography
+                                sx={{
+                                  cursor: 'pointer',
+                                  color: 'primary.main',
+                                  textDecoration: 'underline',
+                                  '&:hover': {
+                                    color: 'primary.dark',
+                                  },
+                                }}
+                                onClick={() => handleViewUserDetails(enrollment)}
+                              >
+                                {enrollment.student_employee_id || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography
+                                sx={{
+                                  cursor: 'pointer',
+                                  color: 'primary.main',
+                                  textDecoration: 'underline',
+                                  '&:hover': {
+                                    color: 'primary.dark',
+                                  },
+                                }}
+                                onClick={() => handleViewUserDetails(enrollment)}
+                              >
+                                {enrollment.student_name}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>{enrollment.student_email}</TableCell>
+                            <TableCell>{enrollment.student_sbu}</TableCell>
+                            <TableCell>{enrollment.course_name}</TableCell>
+                            <TableCell>{enrollment.batch_code}</TableCell>
+                            <TableCell>
+                              <Chip
+                                label={enrollment.approval_status}
+                                color={
+                                  enrollment.approval_status === 'Approved' ? 'success' :
+                                  enrollment.approval_status === 'Pending' ? 'warning' :
+                                  enrollment.approval_status === 'Withdrawn' ? 'error' : 'default'
+                                }
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {(() => {
+                                const rate = enrollment.overall_completion_rate || 0;
+                                let color = 'error.main';
+                                if (rate >= 75) {
+                                  color = 'success.main';
+                                } else if (rate >= 60) {
+                                  color = 'warning.main';
+                                }
+                                return (
+                                  <Typography
+                                    sx={{
+                                      color: color,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
+                                  </Typography>
+                                );
+                              })()}
+                            </TableCell>
+                            <TableCell>
+                              <Box display="flex" gap={1}>
+                                {enrollment.approval_status === 'Pending' && (
+                                  <>
+                                    <IconButton
+                                      size="small"
+                                      color="success"
+                                      onClick={() => handleApprove(enrollment.id)}
+                                      title="Approve"
+                                    >
+                                      <CheckCircle />
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleReject(enrollment.id)}
+                                      title="Reject"
+                                    >
+                                      <Cancel />
+                                    </IconButton>
+                                  </>
+                                )}
+                                {enrollment.approval_status === 'Approved' && (
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleWithdraw(enrollment)}
+                                    title="Withdraw Student"
+                                  >
+                                    <PersonRemove />
+                                  </IconButton>
+                                )}
+                                {enrollment.approval_status === 'Withdrawn' && (
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => handleReapprove(enrollment.id)}
+                                    title="Reapprove"
+                                  >
+                                    <Refresh />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Not Eligible Enrollments Section */}
+          {enrollments.filter(e => e.eligibility_status !== 'Eligible').length > 0 && (
+            <Card
+              sx={{
+                borderRadius: 3,
+                boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                overflow: 'hidden',
+              }}
+            >
+              <CardContent>
+                <Typography 
+                  variant="h6" 
+                  gutterBottom
+                  sx={{ 
+                    mb: 2,
+                    color: theme.palette.error.main,
+                    fontWeight: 600,
+                  }}
+                >
+                  Not Eligible Enrollments ({enrollments.filter(e => e.eligibility_status !== 'Eligible').length})
+                </Typography>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: alpha(theme.palette.error.main, 0.1) }}>
+                        <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Course</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Batch</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Eligibility</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Approval</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {enrollments
+                        .filter(enrollment => enrollment.eligibility_status !== 'Eligible')
+                        .map((enrollment) => (
+                          <TableRow key={enrollment.id} hover>
+                            <TableCell>
+                              <Typography
+                                sx={{
+                                  cursor: 'pointer',
+                                  color: 'primary.main',
+                                  textDecoration: 'underline',
+                                  '&:hover': {
+                                    color: 'primary.dark',
+                                  },
+                                }}
+                                onClick={() => handleViewUserDetails(enrollment)}
+                              >
+                                {enrollment.student_employee_id || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography
+                                sx={{
+                                  cursor: 'pointer',
+                                  color: 'primary.main',
+                                  textDecoration: 'underline',
+                                  '&:hover': {
+                                    color: 'primary.dark',
+                                  },
+                                }}
+                                onClick={() => handleViewUserDetails(enrollment)}
+                              >
+                                {enrollment.student_name}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>{enrollment.student_email}</TableCell>
+                            <TableCell>{enrollment.student_sbu}</TableCell>
+                            <TableCell>{enrollment.course_name}</TableCell>
+                            <TableCell>{enrollment.batch_code}</TableCell>
+                            <TableCell>
+                              <Box>
+                                <Chip
+                                  label={enrollment.eligibility_status}
+                                  color="error"
+                                  size="small"
+                                  sx={{ mb: enrollment.eligibility_reason ? 0.5 : 0 }}
+                                />
+                                {enrollment.eligibility_reason && (
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      display: 'block',
+                                      color: 'text.secondary',
+                                      mt: 0.5,
+                                      fontStyle: 'italic',
+                                    }}
+                                  >
+                                    {enrollment.eligibility_reason}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={enrollment.approval_status}
+                                color={
+                                  enrollment.approval_status === 'Approved' ? 'success' :
+                                  enrollment.approval_status === 'Pending' ? 'warning' :
+                                  enrollment.approval_status === 'Withdrawn' ? 'error' : 'default'
+                                }
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {(() => {
+                                const rate = enrollment.overall_completion_rate || 0;
+                                let color = 'error.main';
+                                if (rate >= 75) {
+                                  color = 'success.main';
+                                } else if (rate >= 60) {
+                                  color = 'warning.main';
+                                }
+                                return (
+                                  <Typography
+                                    sx={{
+                                      color: color,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
+                                  </Typography>
+                                );
+                              })()}
+                            </TableCell>
+                            <TableCell>
+                              <Box display="flex" gap={1}>
+                                {enrollment.approval_status === 'Pending' && (
+                                  <>
+                                    <IconButton
+                                      size="small"
+                                      color="success"
+                                      onClick={() => handleApprove(enrollment.id)}
+                                      disabled
+                                      title="Cannot approve ineligible enrollment"
+                                    >
+                                      <CheckCircle />
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleReject(enrollment.id)}
+                                      title="Reject"
+                                    >
+                                      <Cancel />
+                                    </IconButton>
+                                  </>
+                                )}
+                                {enrollment.approval_status === 'Approved' && (
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleWithdraw(enrollment)}
+                                    title="Withdraw Student"
+                                  >
+                                    <PersonRemove />
+                                  </IconButton>
+                                )}
+                                {enrollment.approval_status === 'Withdrawn' && (
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => handleReapprove(enrollment.id)}
+                                    title="Reapprove"
+                                  >
+                                    <Refresh />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {enrollments.length === 0 && !loading && (
+            <Card
+              sx={{
+                borderRadius: 3,
+                boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              }}
+            >
+              <CardContent>
+                <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 4 }}>
+                  No enrollments found matching the selected filters.
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
+        </Box>
       )}
 
       {/* Withdraw Dialog */}
@@ -323,6 +748,9 @@ function Enrollments() {
         }}
         enrollment={selectedUserEnrollment}
         onViewCourseDetails={handleViewCourseDetails}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onReapprove={handleReapprove}
       />
 
       {/* Course Details Dialog */}
@@ -334,9 +762,64 @@ function Enrollments() {
         }}
         enrollment={selectedCourseEnrollment}
       />
+
+      {/* Manual Enrollment Dialog */}
+      <Dialog
+        open={manualEnrollDialogOpen}
+        onClose={handleManualEnrollCancel}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Manual Enrollment</DialogTitle>
+        <DialogContent>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            <TextField
+              select
+              label="Select Student"
+              value={manualEnrollData.student_id}
+              onChange={(e) => setManualEnrollData({ ...manualEnrollData, student_id: e.target.value })}
+              fullWidth
+              required
+            >
+              <MenuItem value="">Select a student...</MenuItem>
+              {students.map((student) => (
+                <MenuItem key={student.id} value={student.id}>
+                  {student.name} ({student.employee_id}) - {student.email}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="Select Course"
+              value={manualEnrollData.course_id}
+              onChange={(e) => setManualEnrollData({ ...manualEnrollData, course_id: e.target.value })}
+              fullWidth
+              required
+            >
+              <MenuItem value="">Select a course...</MenuItem>
+              {courses.map((course) => (
+                <MenuItem key={course.id} value={course.id}>
+                  {course.name} - {course.batch_code}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleManualEnrollCancel}>Cancel</Button>
+          <Button onClick={handleManualEnrollConfirm} variant="contained">
+            Create Enrollment
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
 
 export default Enrollments;
-

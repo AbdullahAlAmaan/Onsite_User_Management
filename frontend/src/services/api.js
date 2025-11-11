@@ -7,6 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
 });
 
 // Initialize token from localStorage if available
@@ -57,9 +58,11 @@ export const enrollmentsAPI = {
   getAll: (params) => api.get('/enrollments', { params }),
   getEligible: (params) => api.get('/enrollments/eligible', { params }),
   getById: (id) => api.get(`/enrollments/${id}`),
+  create: (data) => api.post('/enrollments', data),
   approve: (data, approvedBy) => api.post('/enrollments/approve', data, { params: { approved_by: approvedBy } }),
   bulkApprove: (data, approvedBy) => api.post('/enrollments/approve/bulk', data, { params: { approved_by: approvedBy } }),
   withdraw: (id, reason, withdrawnBy) => api.post(`/enrollments/${id}/withdraw`, null, { params: { withdrawal_reason: reason, withdrawn_by: withdrawnBy } }),
+  reapprove: (id, approvedBy) => api.post(`/enrollments/${id}/reapprove`, null, { params: { approved_by: approvedBy } }),
 };
 
 export const coursesAPI = {
@@ -76,6 +79,7 @@ export const studentsAPI = {
   getById: (id) => api.get(`/students/${id}`),
   create: (data) => api.post('/students', data),
   getEnrollments: (id) => api.get(`/students/${id}/enrollments`),
+  getAllWithCourses: (params) => api.get('/students/all/with-courses', { params }),
 };
 
 export const importsAPI = {
@@ -101,6 +105,13 @@ export const completionsAPI = {
     const formData = new FormData();
     formData.append('file', file);
     return api.post(`/completions/upload?course_id=${courseId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadAttendance: (file, courseId) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/completions/attendance/upload?course_id=${courseId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

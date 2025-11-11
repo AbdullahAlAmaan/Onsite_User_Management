@@ -15,10 +15,8 @@ import {
   Button,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import SchoolIcon from '@mui/icons-material/School';
 import PeopleIcon from '@mui/icons-material/People';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
@@ -26,11 +24,9 @@ import api from '../services/api';
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Enrollments', icon: <PeopleIcon />, path: '/enrollments' },
   { text: 'Courses', icon: <SchoolIcon />, path: '/courses' },
-  { text: 'Approvals', icon: <DashboardIcon />, path: '/instructor' },
-  { text: 'Imports', icon: <UploadFileIcon />, path: '/imports' },
+  { text: 'Users', icon: <PeopleIcon />, path: '/users' },
 ];
 
 function Layout({ children }) {

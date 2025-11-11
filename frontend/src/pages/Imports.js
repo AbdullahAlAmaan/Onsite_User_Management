@@ -17,7 +17,7 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import { UploadFile, People, Assessment } from '@mui/icons-material';
+import { UploadFile, People, Assessment, EventAvailable } from '@mui/icons-material';
 import { importsAPI, coursesAPI, completionsAPI } from '../services/api';
 
 function Imports() {
@@ -71,11 +71,16 @@ function Imports() {
         const response = await importsAPI.uploadCSV(file, selectedCourse);
         setResults(response.data.results);
         setMessage({ type: 'success', text: response.data.message });
-      } else {
+      } else if (tabValue === 1) {
         // Scores/Assessment
         const response = await completionsAPI.upload(file, selectedCourse);
         setResults(response.data.results);
         setMessage({ type: 'success', text: response.data.message });
+      } else if (tabValue === 2) {
+        // Attendance
+        const response = await completionsAPI.uploadAttendance(file, selectedCourse);
+        setResults(response.data);
+        setMessage({ type: 'success', text: 'Attendance uploaded successfully' });
       }
       setFile(null);
     } catch (error) {
@@ -103,11 +108,16 @@ function Imports() {
         const response = await importsAPI.uploadExcel(file, selectedCourse);
         setResults(response.data.results);
         setMessage({ type: 'success', text: response.data.message });
-      } else {
+      } else if (tabValue === 1) {
         // Scores/Assessment
         const response = await completionsAPI.upload(file, selectedCourse);
         setResults(response.data.results);
         setMessage({ type: 'success', text: response.data.message });
+      } else if (tabValue === 2) {
+        // Attendance
+        const response = await completionsAPI.uploadAttendance(file, selectedCourse);
+        setResults(response.data);
+        setMessage({ type: 'success', text: 'Attendance uploaded successfully' });
       }
       setFile(null);
     } catch (error) {
@@ -186,10 +196,13 @@ function Imports() {
           >
             <Tab icon={<People />} iconPosition="start" label="Enrollment Registrations" />
             <Tab icon={<Assessment />} iconPosition="start" label="Scores & Assessment" />
+            <Tab icon={<EventAvailable />} iconPosition="start" label="Attendance" />
           </Tabs>
 
           <Typography variant="h6" gutterBottom>
-            {tabValue === 0 ? 'Upload Enrollment Registration File' : 'Upload Scores & Assessment File'}
+            {tabValue === 0 ? 'Upload Enrollment Registration File' : 
+             tabValue === 1 ? 'Upload Scores & Assessment File' : 
+             'Upload Attendance File (name, email, total_attendance, present, status)'}
           </Typography>
           <Box display="flex" flexDirection="column" gap={2} sx={{ mt: 2 }}>
             {loadingCourses ? (
@@ -333,10 +346,27 @@ function Imports() {
                     </ListItem>
                   )}
                 </>
+              ) : tabValue === 1 ? (
+                <>
+                  <ListItem>
+                    <ListItemText primary="Processed" secondary={results.processed} />
+                  </ListItem>
+                  {results.not_found !== undefined && results.not_found > 0 && (
+                    <ListItem>
+                      <ListItemText
+                        primary="Not Found"
+                        secondary={`${results.not_found} students not found or not enrolled`}
+                      />
+                    </ListItem>
+                  )}
+                </>
               ) : (
                 <>
                   <ListItem>
                     <ListItemText primary="Processed" secondary={results.processed} />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText primary="Updated" secondary={results.updated} />
                   </ListItem>
                   {results.not_found !== undefined && results.not_found > 0 && (
                     <ListItem>
