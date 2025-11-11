@@ -71,14 +71,15 @@ def get_student_enrollments(student_id: int, db: Session = Depends(get_db)):
         enrollment_dict['student_employee_id'] = enrollment.student.employee_id
         enrollment_dict['student_designation'] = enrollment.student.designation
         enrollment_dict['student_experience_years'] = enrollment.student.experience_years
-        enrollment_dict['course_name'] = enrollment.course.name
-        enrollment_dict['batch_code'] = enrollment.course.batch_code
+        # Use stored course info (preserved even if course is deleted)
+        enrollment_dict['course_name'] = enrollment.course_name or (enrollment.course.name if enrollment.course else None)
+        enrollment_dict['batch_code'] = enrollment.batch_code or (enrollment.course.batch_code if enrollment.course else None)
         enrollment_dict['attendance_percentage'] = enrollment.attendance_percentage
         enrollment_dict['total_attendance'] = enrollment.total_attendance
         enrollment_dict['present'] = enrollment.present
         enrollment_dict['attendance_status'] = enrollment.attendance_status
-        enrollment_dict['course_start_date'] = enrollment.course.start_date.isoformat() if enrollment.course.start_date else None
-        enrollment_dict['course_end_date'] = enrollment.course.end_date.isoformat() if enrollment.course.end_date else None
+        enrollment_dict['course_start_date'] = enrollment.course.start_date.isoformat() if enrollment.course and enrollment.course.start_date else None
+        enrollment_dict['course_end_date'] = enrollment.course.end_date.isoformat() if enrollment.course and enrollment.course.end_date else None
         enrollment_dict['completion_date'] = enrollment.completion_date.isoformat() if enrollment.completion_date else None
         result.append(enrollment_dict)
     
