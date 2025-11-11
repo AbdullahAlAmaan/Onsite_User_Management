@@ -6,7 +6,7 @@ from app.models.enrollment import EligibilityStatus, ApprovalStatus, CompletionS
 class EnrollmentResponse(BaseModel):
     id: int
     student_id: int
-    course_id: int
+    course_id: Optional[int]  # Nullable to preserve history when course is deleted
     eligibility_status: EligibilityStatus
     eligibility_reason: Optional[str]
     eligibility_checked_at: Optional[datetime]
