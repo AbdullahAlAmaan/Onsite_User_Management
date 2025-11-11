@@ -463,7 +463,7 @@ function Courses() {
               backgroundClip: 'text',
             }}
           >
-            {showArchived ? 'Archived Courses' : 'Course Management'}
+            {showArchived ? 'Archived Courses' : 'Courses'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             {showArchived ? 'View historical course data and enrollments' : 'Manage active courses and enrollments'}
@@ -924,7 +924,6 @@ function Courses() {
               value={formData.total_classes_offered}
               onChange={(e) => setFormData({ ...formData, total_classes_offered: e.target.value })}
               fullWidth
-              helperText="Total number of classes in this course (used for attendance percentage calculation)"
               inputProps={{ min: 1 }}
             />
           </Box>

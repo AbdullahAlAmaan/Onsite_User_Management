@@ -26,7 +26,7 @@ const drawerWidth = 240;
 const menuItems = [
   { text: 'Enrollments', icon: <PeopleIcon />, path: '/enrollments' },
   { text: 'Courses', icon: <SchoolIcon />, path: '/courses' },
-  { text: 'Users', icon: <PeopleIcon />, path: '/users' },
+  { text: 'Employees', icon: <PeopleIcon />, path: '/users' },
 ];
 
 function Layout({ children }) {
@@ -90,8 +90,8 @@ function Layout({ children }) {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Physical Course Enrollment Management
+          <Typography variant="h4" noWrap component="div" sx={{ flexGrow: 1 }}>
+            ENROLL23
           </Typography>
           <Button color="inherit" startIcon={<LogoutIcon />} onClick={handleLogout}>
             Logout

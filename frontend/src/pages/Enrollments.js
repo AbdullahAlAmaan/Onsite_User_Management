@@ -228,7 +228,7 @@ function Enrollments() {
               backgroundClip: 'text',
             }}
           >
-            Enrollments & Approvals
+            Registered Users
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             View, manage, and approve all course enrollments
