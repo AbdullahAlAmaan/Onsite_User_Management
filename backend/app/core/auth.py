@@ -1,22 +1,33 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.core.config import settings
 
 security = HTTPBearer()
 
 def verify_admin_credentials(email: str, password: str) -> bool:
-    """Verify admin credentials from environment variables."""
+    """Verify admin credentials from environment variables.
+    Uses constant-time comparison to prevent timing attacks."""
+    from secrets import compare_digest
+    
     admin_email = getattr(settings, 'ADMIN_EMAIL', '')
     admin_password = getattr(settings, 'ADMIN_PASSWORD', '')
     
-    return email == admin_email and password == admin_password
+    # Use constant-time comparison to prevent timing attacks
+    email_match = compare_digest(email.encode('utf-8'), admin_email.encode('utf-8'))
+    password_match = compare_digest(password.encode('utf-8'), admin_password.encode('utf-8'))
+    
+    return email_match and password_match
 
 def create_access_token(email: str) -> str:
     """Create JWT access token for admin."""
-    expire = datetime.utcnow() + timedelta(hours=24)
-    to_encode = {"sub": email, "exp": expire, "role": "admin"}
+    # Use ACCESS_TOKEN_EXPIRE_MINUTES from settings (default 30 minutes)
+    # Use UTC-aware datetime for consistent timestamp calculation
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # Convert datetime to Unix timestamp (JWT exp must be numeric)
+    expire_timestamp = int(expire.timestamp())
+    to_encode = {"sub": email, "exp": expire_timestamp, "role": "admin"}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 

@@ -142,10 +142,14 @@ function Courses() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
+    const confirmMessage = showArchived 
+      ? 'Are you sure you want to PERMANENTLY DELETE this archived course? This will completely remove it from the database and cannot be undone. All course data will be lost forever.'
+      : 'Are you sure you want to PERMANENTLY DELETE this course? This will completely remove it from the database and cannot be undone. All course data will be lost forever.';
+    
+    if (window.confirm(confirmMessage)) {
       try {
         await coursesAPI.delete(id);
-        setMessage({ type: 'success', text: 'Course deleted successfully' });
+        setMessage({ type: 'success', text: 'Course permanently deleted successfully' });
         fetchCourses();
       } catch (error) {
         setMessage({ type: 'error', text: error.response?.data?.detail || 'Error deleting course' });
@@ -624,7 +628,16 @@ function Courses() {
                           </>
                         )}
                         {showArchived && (
-                          <Chip label="Archived" color="default" size="small" />
+                          <>
+                            <IconButton
+                              color="error"
+                              onClick={() => handleDelete(course.id)}
+                              title="Permanently Delete Course"
+                            >
+                              <Delete />
+                            </IconButton>
+                            <Chip label="Archived" color="default" size="small" />
+                          </>
                         )}
                       </Box>
                     </TableCell>

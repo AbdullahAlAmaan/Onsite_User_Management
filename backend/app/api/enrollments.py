@@ -30,12 +30,27 @@ def get_enrollments(
     if student_id:
         query = query.filter(Enrollment.student_id == student_id)
     if eligibility_status:
-        query = query.filter(Enrollment.eligibility_status == eligibility_status)
+        # Validate eligibility_status against enum values
+        try:
+            EligibilityStatus(eligibility_status)
+            query = query.filter(Enrollment.eligibility_status == eligibility_status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid eligibility_status value")
     if approval_status:
-        query = query.filter(Enrollment.approval_status == approval_status)
+        # Validate approval_status against enum values
+        try:
+            ApprovalStatus(approval_status)
+            query = query.filter(Enrollment.approval_status == approval_status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid approval_status value")
     if sbu:
         from app.models.student import Student
-        query = query.join(Student).filter(Student.sbu == sbu)
+        from app.core.validation import validate_sbu
+        try:
+            validated_sbu = validate_sbu(sbu)
+            query = query.join(Student).filter(Student.sbu == validated_sbu)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     
     enrollments = query.offset(skip).limit(limit).all()
     
@@ -50,9 +65,9 @@ def get_enrollments(
         enrollment_dict['student_employee_id'] = enrollment.student.employee_id
         enrollment_dict['student_designation'] = enrollment.student.designation
         enrollment_dict['student_experience_years'] = enrollment.student.experience_years
-        enrollment_dict['course_name'] = enrollment.course.name
-        enrollment_dict['batch_code'] = enrollment.course.batch_code
-        enrollment_dict['course_description'] = enrollment.course.description
+        enrollment_dict['course_name'] = enrollment.course_name or (enrollment.course.name if enrollment.course else None)
+        enrollment_dict['batch_code'] = enrollment.batch_code or (enrollment.course.batch_code if enrollment.course else None)
+        enrollment_dict['course_description'] = enrollment.course.description if enrollment.course else None
         
         # Calculate overall completion rate for this student across all courses
         all_student_enrollments = db.query(Enrollment).filter(
@@ -105,9 +120,9 @@ def get_eligible_enrollments(
         enrollment_dict['student_employee_id'] = enrollment.student.employee_id
         enrollment_dict['student_designation'] = enrollment.student.designation
         enrollment_dict['student_experience_years'] = enrollment.student.experience_years
-        enrollment_dict['course_name'] = enrollment.course.name
-        enrollment_dict['batch_code'] = enrollment.course.batch_code
-        enrollment_dict['course_description'] = enrollment.course.description
+        enrollment_dict['course_name'] = enrollment.course_name or (enrollment.course.name if enrollment.course else None)
+        enrollment_dict['batch_code'] = enrollment.batch_code or (enrollment.course.batch_code if enrollment.course else None)
+        enrollment_dict['course_description'] = enrollment.course.description if enrollment.course else None
         result.append(EnrollmentResponse(**enrollment_dict))
     
     return result
@@ -372,6 +387,8 @@ def create_enrollment(
     enrollment = Enrollment(
         student_id=enrollment_data.student_id,
         course_id=enrollment_data.course_id,
+        course_name=course.name,  # Store course name for history preservation
+        batch_code=course.batch_code,  # Store batch code for history preservation
         eligibility_status=eligibility_status,
         eligibility_reason=reason,
         eligibility_checked_at=datetime.utcnow(),

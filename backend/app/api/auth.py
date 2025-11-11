@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel, EmailStr
 from app.core.auth import verify_admin_credentials, create_access_token, get_current_admin
+from app.core.rate_limit import rate_limit
 
 router = APIRouter()
 
@@ -14,8 +15,9 @@ class LoginResponse(BaseModel):
     email: str
 
 @router.post("/login", response_model=LoginResponse)
-def login(credentials: LoginRequest):
-    """Admin login endpoint."""
+@rate_limit(max_requests=5, window_seconds=300)  # 5 attempts per 5 minutes
+async def login(request: Request, credentials: LoginRequest):
+    """Admin login endpoint with rate limiting."""
     if verify_admin_credentials(credentials.email, credentials.password):
         access_token = create_access_token(credentials.email)
         return LoginResponse(

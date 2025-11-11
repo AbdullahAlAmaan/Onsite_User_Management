@@ -21,7 +21,7 @@ class Course(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    enrollments = relationship("Enrollment", back_populates="course", cascade="all, delete-orphan")
+    enrollments = relationship("Enrollment", back_populates="course")  # No cascade - preserve enrollments when course is deleted
     prerequisite = relationship("Course", remote_side=[id], backref="dependent_courses")
     
     def __repr__(self):

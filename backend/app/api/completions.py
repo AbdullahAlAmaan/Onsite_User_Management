@@ -9,6 +9,7 @@ from app.db.base import get_db
 from app.core.config import settings
 from app.models.enrollment import Enrollment, CompletionStatus
 from app.schemas.enrollment import CompletionUpload, CompletionBulkUpload
+from app.core.file_utils import sanitize_filename, validate_file_extension, validate_file_size, get_safe_file_path
 
 router = APIRouter()
 
@@ -19,14 +20,24 @@ async def upload_completions(
     db: Session = Depends(get_db)
 ):
     """Upload completion results via Excel/CSV. Matches students by employee_id or email."""
-    # Validate file type
-    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-        raise HTTPException(status_code=400, detail="File must be Excel or CSV format")
+    # Validate and sanitize filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
     
-    # Save uploaded file temporarily
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    validate_file_extension(file.filename)
+    safe_filename = sanitize_filename(file.filename)
+    
+    # Read file content to check size
+    content = await file.read()
+    validate_file_size(len(content))
+    
+    # Reset file pointer
+    await file.seek(0)
+    
+    # Save uploaded file temporarily with safe path
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    file_path = os.path.join(settings.UPLOAD_DIR, f"{timestamp}_{file.filename}")
+    timestamped_filename = f"{timestamp}_{safe_filename}"
+    file_path = get_safe_file_path(timestamped_filename)
     
     async with aiofiles.open(file_path, 'wb') as out_file:
         content = await file.read()
@@ -135,7 +146,7 @@ async def upload_completions(
             except Exception as e:
                 results["errors"].append({
                     "row": idx + 2,
-                    "error": str(e)
+                    "error": "Error processing row"
                 })
         
         db.commit()
@@ -148,7 +159,8 @@ async def upload_completions(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
+        # Don't expose internal error details
+        raise HTTPException(status_code=400, detail="Error processing file. Please check the file format and try again.")
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -226,14 +238,24 @@ async def upload_attendance(
     Expected columns: name/email/bsid, total_classes_attended (or similar), score.
     Matches students by bsid/employee_id, email, or name.
     Calculates completion status based on 80% attendance threshold using course.total_classes_offered."""
-    # Validate file type
-    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-        raise HTTPException(status_code=400, detail="File must be Excel or CSV format")
+    # Validate and sanitize filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
     
-    # Save uploaded file temporarily
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    validate_file_extension(file.filename)
+    safe_filename = sanitize_filename(file.filename)
+    
+    # Read file content to check size
+    content = await file.read()
+    validate_file_size(len(content))
+    
+    # Reset file pointer
+    await file.seek(0)
+    
+    # Save uploaded file temporarily with safe path
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    file_path = os.path.join(settings.UPLOAD_DIR, f"{timestamp}_{file.filename}")
+    timestamped_filename = f"{timestamp}_{safe_filename}"
+    file_path = get_safe_file_path(timestamped_filename)
     
     async with aiofiles.open(file_path, 'wb') as out_file:
         content = await file.read()
@@ -424,7 +446,7 @@ async def upload_attendance(
             except Exception as e:
                 results["errors"].append({
                     "row": idx + 2,
-                    "error": str(e)
+                    "error": "Error processing row"
                 })
         
         db.commit()
@@ -435,7 +457,8 @@ async def upload_attendance(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+        # Don't expose internal error details
+        raise HTTPException(status_code=500, detail="Error processing file. Please check the file format and try again.")
     finally:
         # Clean up temp file
         if os.path.exists(file_path):

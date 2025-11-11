@@ -28,10 +28,16 @@ def get_students(
     db: Session = Depends(get_db)
 ):
     """Get all students with optional filters."""
+    from app.core.validation import validate_sbu
+    
     query = db.query(Student)
     
     if sbu:
-        query = query.filter(Student.sbu == sbu)
+        try:
+            validated_sbu = validate_sbu(sbu)
+            query = query.filter(Student.sbu == validated_sbu)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     
     students = query.offset(skip).limit(limit).all()
     return [StudentResponse.from_orm(student) for student in students]
@@ -89,10 +95,16 @@ def get_all_students_with_courses(
     from app.models.enrollment import Enrollment, CompletionStatus
     from sqlalchemy.orm import joinedload
     
+    from app.core.validation import validate_sbu
+    
     query = db.query(Student)
     
     if sbu:
-        query = query.filter(Student.sbu == sbu)
+        try:
+            validated_sbu = validate_sbu(sbu)
+            query = query.filter(Student.sbu == validated_sbu)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     
     students = query.offset(skip).limit(limit).all()
     
@@ -107,14 +119,15 @@ def get_all_students_with_courses(
         student_dict['never_taken_course'] = len(enrollments) == 0
         
         for enrollment in enrollments:
-            # Ensure course relationship is loaded
-            if not enrollment.course:
-                continue  # Skip enrollments without a course
+            # Use stored course info if available, otherwise fall back to course relationship
+            # This preserves history even when course is deleted
+            course_name = enrollment.course_name or (enrollment.course.name if enrollment.course else None)
+            batch_code = enrollment.batch_code or (enrollment.course.batch_code if enrollment.course else None)
             
             enrollment_dict = {
                 'id': enrollment.id,
-                'course_name': enrollment.course.name if enrollment.course else None,
-                'batch_code': enrollment.course.batch_code if enrollment.course else None,
+                'course_name': course_name,
+                'batch_code': batch_code,
                 'approval_status': enrollment.approval_status.value if enrollment.approval_status else None,
                 'completion_status': enrollment.completion_status.value if enrollment.completion_status else None,
                 'eligibility_status': enrollment.eligibility_status.value if enrollment.eligibility_status else None,

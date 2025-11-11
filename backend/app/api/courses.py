@@ -100,12 +100,27 @@ def update_course(
 
 @router.delete("/{course_id}", status_code=204)
 def delete_course(course_id: int, db: Session = Depends(get_db)):
-    """Delete a course (soft delete by archiving)."""
+    """Permanently delete a course from the database. This action cannot be undone.
+    Related enrollments will be preserved with course_id set to NULL to maintain user history."""
+    from app.models.enrollment import Enrollment
+    
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     
-    course.is_archived = True
+    # Preserve enrollments by setting course_id to NULL and storing course info
+    # This maintains user history even after course deletion
+    enrollments = db.query(Enrollment).filter(Enrollment.course_id == course_id).all()
+    for enrollment in enrollments:
+        # Store course info before removing the reference
+        if not enrollment.course_name:
+            enrollment.course_name = course.name
+        if not enrollment.batch_code:
+            enrollment.batch_code = course.batch_code
+        enrollment.course_id = None
+    
+    # Permanently delete the course
+    db.delete(course)
     db.commit()
     return None
 

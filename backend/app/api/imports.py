@@ -7,7 +7,7 @@ from datetime import datetime
 from app.db.base import get_db
 from app.core.config import settings
 from app.services.import_service import ImportService
-from app.services.azure_storage_service import AzureStorageService
+from app.core.file_utils import sanitize_filename, validate_file_extension, validate_file_size, get_safe_file_path
 
 router = APIRouter()
 
@@ -18,25 +18,28 @@ async def upload_excel(
     db: Session = Depends(get_db)
 ):
     """Upload and process Excel file with enrollment data."""
-    # Validate file type
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="File must be Excel format (.xlsx or .xls)")
+    # Validate and sanitize filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
     
-    # Save uploaded file temporarily
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    validate_file_extension(file.filename)
+    safe_filename = sanitize_filename(file.filename)
+    
+    # Read file content to check size
+    content = await file.read()
+    validate_file_size(len(content))
+    
+    # Reset file pointer
+    await file.seek(0)
+    
+    # Save uploaded file temporarily with safe path
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    file_path = os.path.join(settings.UPLOAD_DIR, f"{timestamp}_{file.filename}")
+    timestamped_filename = f"{timestamp}_{safe_filename}"
+    file_path = get_safe_file_path(timestamped_filename)
     
     async with aiofiles.open(file_path, 'wb') as out_file:
         content = await file.read()
         await out_file.write(content)
-    
-    # Upload to Azure Blob Storage if configured
-    blob_url = None
-    storage_service = AzureStorageService()
-    if storage_service.blob_service_client:
-        blob_name = f"imports/{timestamp}_{file.filename}"
-        blob_url = storage_service.upload_file(file_path, blob_name)
     
     try:
         # Parse and process
@@ -45,11 +48,13 @@ async def upload_excel(
         
         return {
             "message": "File processed successfully",
-            "results": results,
-            "blob_url": blob_url
+            "results": results
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
+        # Don't expose internal error details
+        raise HTTPException(status_code=400, detail="Error processing file. Please check the file format and try again.")
     finally:
         # Clean up local file
         if os.path.exists(file_path):
@@ -62,23 +67,28 @@ async def upload_csv(
     db: Session = Depends(get_db)
 ):
     """Upload and process CSV file with enrollment data."""
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="File must be CSV format")
+    # Validate and sanitize filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
     
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    validate_file_extension(file.filename)
+    safe_filename = sanitize_filename(file.filename)
+    
+    # Read file content to check size
+    content = await file.read()
+    validate_file_size(len(content))
+    
+    # Reset file pointer
+    await file.seek(0)
+    
+    # Save uploaded file temporarily with safe path
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    file_path = os.path.join(settings.UPLOAD_DIR, f"{timestamp}_{file.filename}")
+    timestamped_filename = f"{timestamp}_{safe_filename}"
+    file_path = get_safe_file_path(timestamped_filename)
     
     async with aiofiles.open(file_path, 'wb') as out_file:
         content = await file.read()
         await out_file.write(content)
-    
-    # Upload to Azure Blob Storage if configured
-    blob_url = None
-    storage_service = AzureStorageService()
-    if storage_service.blob_service_client:
-        blob_name = f"imports/{timestamp}_{file.filename}"
-        blob_url = storage_service.upload_file(file_path, blob_name)
     
     try:
         records = ImportService.parse_csv(file_path)
@@ -86,11 +96,13 @@ async def upload_csv(
         
         return {
             "message": "File processed successfully",
-            "results": results,
-            "blob_url": blob_url
+            "results": results
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
+        # Don't expose internal error details
+        raise HTTPException(status_code=400, detail="Error processing file. Please check the file format and try again.")
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)

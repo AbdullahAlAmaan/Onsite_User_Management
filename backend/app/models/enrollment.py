@@ -52,7 +52,11 @@ class Enrollment(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False, index=True)
-    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)  # Nullable to preserve history when course is deleted
+    
+    # Denormalized course info (preserved even when course is deleted)
+    course_name = Column(String, nullable=True)  # Store course name for history
+    batch_code = Column(String, nullable=True)  # Store batch code for history
     
     # Eligibility
     eligibility_status = Column(Enum(EligibilityStatus), default=EligibilityStatus.PENDING, nullable=False)

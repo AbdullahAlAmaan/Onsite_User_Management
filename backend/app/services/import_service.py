@@ -189,6 +189,8 @@ class ImportService:
                 enrollment = Enrollment(
                     student_id=student.id,
                     course_id=course.id,
+                    course_name=course.name,  # Store course name for history preservation
+                    batch_code=course.batch_code,  # Store batch code for history preservation
                     eligibility_status=eligibility_status,
                     eligibility_reason=reason,
                     eligibility_checked_at=datetime.utcnow(),
