@@ -22,6 +22,9 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
   const theme = useTheme();
   const [studentEnrollments, setStudentEnrollments] = useState([]);
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
+  const [overallCompletionRate, setOverallCompletionRate] = useState(0);
+  const [totalCoursesAssigned, setTotalCoursesAssigned] = useState(0);
+  const [completedCourses, setCompletedCourses] = useState(0);
 
   const fetchStudentEnrollments = async () => {
     if (!enrollment?.student_id) {
@@ -34,10 +37,33 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
       console.log('UserDetailsDialog: Fetching enrollments for student_id:', enrollment.student_id);
       const response = await studentsAPI.getEnrollments(enrollment.student_id);
       console.log('UserDetailsDialog: Received enrollments:', response.data);
-      setStudentEnrollments(response.data || []);
+      
+      // Handle both old format (array) and new format (object with enrollments and stats)
+      if (Array.isArray(response.data)) {
+        setStudentEnrollments(response.data || []);
+        // Calculate from enrollments if not provided
+        const relevant = response.data.filter(e => 
+          (e.approval_status === 'Withdrawn') ||
+          (e.approval_status === 'Approved' && ['Completed', 'Failed'].includes(e.completion_status))
+        ).filter(e => e.approval_status !== 'Rejected');
+        const total = relevant.length;
+        const completed = relevant.filter(e => e.completion_status === 'Completed').length;
+        setTotalCoursesAssigned(total);
+        setCompletedCourses(completed);
+        setOverallCompletionRate(total > 0 ? (completed / total) * 100 : 0);
+      } else {
+        // New format with stats
+        setStudentEnrollments(response.data.enrollments || []);
+        setOverallCompletionRate(response.data.overall_completion_rate || 0);
+        setTotalCoursesAssigned(response.data.total_courses_assigned || 0);
+        setCompletedCourses(response.data.completed_courses || 0);
+      }
     } catch (error) {
       console.error('UserDetailsDialog: Error fetching student enrollments:', error);
       setStudentEnrollments([]);
+      setOverallCompletionRate(0);
+      setTotalCoursesAssigned(0);
+      setCompletedCourses(0);
     } finally {
       setLoadingEnrollments(false);
     }
@@ -123,6 +149,56 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
             </Typography>
           </Grid>
           
+          <Grid item xs={12} sx={{ mt: 2 }}>
+            <Card
+              sx={{
+                backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                borderRadius: 2,
+                p: 2,
+              }}
+            >
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Overall Completion Rate
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      fontWeight: 600,
+                      color: (() => {
+                        if (overallCompletionRate >= 75) return theme.palette.success.main;
+                        if (overallCompletionRate >= 60) return theme.palette.warning.main;
+                        return theme.palette.error.main;
+                      })(),
+                    }}
+                  >
+                    {overallCompletionRate.toFixed(1)}%
+                  </Typography>
+                </Box>
+                <Box textAlign="right">
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Courses Completed
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 600,
+                      color: (() => {
+                        if (overallCompletionRate >= 75) return theme.palette.success.main;
+                        if (overallCompletionRate >= 60) return theme.palette.warning.main;
+                        return theme.palette.error.main;
+                      })(),
+                    }}
+                  >
+                    {completedCourses} / {totalCoursesAssigned}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Grid>
+          
           <Grid item xs={12} sx={{ mt: 3 }}>
             <Typography 
               variant="h6" 
@@ -141,7 +217,38 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
               </Box>
             ) : studentEnrollments.length > 0 ? (
               <Box display="flex" flexDirection="column" gap={2}>
-                {studentEnrollments.map((enroll) => {
+                {studentEnrollments
+                  .sort((a, b) => {
+                    // Define order: Completed (1) > Failed (2) > Approved Not Started (3) > Pending (4) > Rejected (5) > Others (6)
+                    const getStatusOrder = (enrollment) => {
+                      // Priority 1: Completed
+                      if (enrollment.completion_status === 'Completed') return 1;
+                      // Priority 2: Failed
+                      if (enrollment.completion_status === 'Failed') return 2;
+                      // Priority 3: Approved + Not Started
+                      if (enrollment.approval_status === 'Approved' && 
+                          enrollment.completion_status === 'Not Started') return 3;
+                      // Priority 4: Pending
+                      if (enrollment.approval_status === 'Pending') return 4;
+                      // Priority 5: Rejected
+                      if (enrollment.approval_status === 'Rejected') return 5;
+                      // Priority 6: Others (In Progress, Withdrawn, etc.)
+                      return 6;
+                    };
+                    
+                    const orderA = getStatusOrder(a);
+                    const orderB = getStatusOrder(b);
+                    
+                    // If same order, sort by creation date (newest first)
+                    if (orderA === orderB) {
+                      const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+                      const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+                      return dateB - dateA;
+                    }
+                    
+                    return orderA - orderB;
+                  })
+                  .map((enroll) => {
                   const isCompleted = enroll.completion_status === 'Completed';
                   const isFailed = enroll.completion_status === 'Failed';
                   const isInProgress = enroll.completion_status === 'In Progress';

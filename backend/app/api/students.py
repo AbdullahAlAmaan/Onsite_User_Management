@@ -51,10 +51,10 @@ def get_student(student_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Student not found")
     return StudentResponse.from_orm(student)
 
-@router.get("/{student_id}/enrollments", response_model=List[dict])
+@router.get("/{student_id}/enrollments", response_model=dict)
 def get_student_enrollments(student_id: int, db: Session = Depends(get_db)):
-    """Get all enrollments for a specific student with full course details."""
-    from app.models.enrollment import Enrollment
+    """Get all enrollments for a specific student with full course details and overall completion rate."""
+    from app.models.enrollment import Enrollment, ApprovalStatus, CompletionStatus
     from app.schemas.enrollment import EnrollmentResponse
     
     student = db.query(Student).filter(Student.id == student_id).first()
@@ -63,7 +63,40 @@ def get_student_enrollments(student_id: int, db: Session = Depends(get_db)):
     
     enrollments = db.query(Enrollment).filter(Enrollment.student_id == student_id).order_by(Enrollment.created_at.desc()).all()
     
-    result = []
+    # Calculate overall completion rate (same logic as in enrollments API)
+    all_student_enrollments = db.query(Enrollment).filter(
+        Enrollment.student_id == student_id
+    ).all()
+    
+    # Filter enrollments to only include those that count toward completion rate:
+    # - COMPLETED or FAILED courses (completion_status) that are APPROVED
+    # - WITHDRAWN courses (approval_status) - these should be included as they have a reason
+    # Exclude: PENDING approvals, NOT_STARTED, IN_PROGRESS, REJECTED
+    relevant_enrollments = [
+        e for e in all_student_enrollments
+        if (
+            # Include withdrawn courses (they have a reason attached, count as not completed)
+            (e.approval_status == ApprovalStatus.WITHDRAWN)
+            # OR include completed/failed courses that are approved (not pending/rejected)
+            or (
+                e.approval_status == ApprovalStatus.APPROVED
+                and e.completion_status in [CompletionStatus.COMPLETED, CompletionStatus.FAILED]
+            )
+        )
+        # Exclude rejected enrollments (admin's decision, not student's fault)
+        and e.approval_status != ApprovalStatus.REJECTED
+    ]
+    
+    total_courses = len(relevant_enrollments)
+    # Only COMPLETED courses count as completed (withdrawn and failed count as not completed)
+    completed_courses = sum(1 for e in relevant_enrollments if e.completion_status == CompletionStatus.COMPLETED)
+    
+    if total_courses > 0:
+        overall_completion_rate = (completed_courses / total_courses) * 100
+    else:
+        overall_completion_rate = 0.0
+    
+    result_enrollments = []
     for enrollment in enrollments:
         enrollment_dict = EnrollmentResponse.from_orm(enrollment).dict()
         enrollment_dict['student_name'] = enrollment.student.name
@@ -82,9 +115,14 @@ def get_student_enrollments(student_id: int, db: Session = Depends(get_db)):
         enrollment_dict['course_start_date'] = enrollment.course.start_date.isoformat() if enrollment.course and enrollment.course.start_date else None
         enrollment_dict['course_end_date'] = enrollment.course.end_date.isoformat() if enrollment.course and enrollment.course.end_date else None
         enrollment_dict['completion_date'] = enrollment.completion_date.isoformat() if enrollment.completion_date else None
-        result.append(enrollment_dict)
+        result_enrollments.append(enrollment_dict)
     
-    return result
+    return {
+        'enrollments': result_enrollments,
+        'overall_completion_rate': round(overall_completion_rate, 1),
+        'total_courses_assigned': total_courses,
+        'completed_courses': completed_courses
+    }
 
 @router.get("/all/with-courses", response_model=List[dict])
 def get_all_students_with_courses(
