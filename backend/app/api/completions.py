@@ -423,19 +423,18 @@ async def upload_attendance(
                     enrollment.attendance_percentage = (classes_attended / course.total_classes_offered) * 100
                     
                     # Determine completion status based on 80% attendance threshold
+                    # Always update completion status based on new attendance percentage
                     # Pass if attendance >= 80%, Fail otherwise
                     if enrollment.attendance_percentage >= 80.0:
                         enrollment.attendance_status = "Pass"
-                        # Update completion status to COMPLETED if it was NOT_STARTED or IN_PROGRESS
-                        if enrollment.completion_status == CompletionStatus.NOT_STARTED or enrollment.completion_status == CompletionStatus.IN_PROGRESS:
-                            enrollment.completion_status = CompletionStatus.COMPLETED
-                            if not enrollment.completion_date:
-                                enrollment.completion_date = datetime.utcnow()
+                        # Always update to COMPLETED if attendance >= 80%
+                        enrollment.completion_status = CompletionStatus.COMPLETED
+                        if not enrollment.completion_date:
+                            enrollment.completion_date = datetime.utcnow()
                     else:
                         enrollment.attendance_status = "Fail"
-                        # Update completion status to FAILED if it was NOT_STARTED or IN_PROGRESS
-                        if enrollment.completion_status == CompletionStatus.NOT_STARTED or enrollment.completion_status == CompletionStatus.IN_PROGRESS:
-                            enrollment.completion_status = CompletionStatus.FAILED
+                        # Always update to FAILED if attendance < 80%
+                        enrollment.completion_status = CompletionStatus.FAILED
                 else:
                     enrollment.attendance_percentage = None
                     enrollment.attendance_status = None
@@ -463,4 +462,83 @@ async def upload_attendance(
         # Clean up temp file
         if os.path.exists(file_path):
             os.remove(file_path)
+
+@router.put("/enrollment/{enrollment_id}", response_model=dict)
+def update_enrollment_attendance(
+    enrollment_id: int,
+    classes_attended: int = Query(..., ge=0, description="Number of classes attended"),
+    score: float = Query(..., ge=0, le=100, description="Score (0-100)"),
+    db: Session = Depends(get_db)
+):
+    """Manually update attendance and score for a single enrollment.
+    Uses the same logic as Excel upload: calculates attendance percentage from course.total_classes_offered
+    and sets completion status based on 80% attendance threshold."""
+    from app.models.enrollment import Enrollment, CompletionStatus
+    from app.models.course import Course
+    
+    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    
+    # Get the course to access total_classes_offered
+    course = None
+    if enrollment.course_id:
+        course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+    elif enrollment.course_name:
+        # If course is deleted, try to get total_classes_offered from a similar course
+        # For now, we'll require the course to exist
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot update attendance for a deleted course. Please restore the course first."
+        )
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found for this enrollment")
+    
+    # Check if course has total_classes_offered set
+    if not course.total_classes_offered or course.total_classes_offered <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Course '{course.name}' does not have 'Total Classes Offered' set. Please set this in the course settings first."
+        )
+    
+    # Validate classes_attended doesn't exceed total_classes_offered
+    if classes_attended > course.total_classes_offered:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Classes attended ({classes_attended}) cannot exceed total classes offered ({course.total_classes_offered})"
+        )
+    
+    # Update attendance data using course.total_classes_offered
+    enrollment.total_attendance = course.total_classes_offered
+    enrollment.present = classes_attended
+    enrollment.score = score
+    
+    # Calculate attendance percentage using course.total_classes_offered
+    enrollment.attendance_percentage = (classes_attended / course.total_classes_offered) * 100
+    
+    # Determine completion status based on 80% attendance threshold
+    # Always update completion status based on new attendance percentage
+    # Pass if attendance >= 80%, Fail otherwise
+    if enrollment.attendance_percentage >= 80.0:
+        enrollment.attendance_status = "Pass"
+        # Always update to COMPLETED if attendance >= 80%
+        enrollment.completion_status = CompletionStatus.COMPLETED
+        if not enrollment.completion_date:
+            enrollment.completion_date = datetime.utcnow()
+    else:
+        enrollment.attendance_status = "Fail"
+        # Always update to FAILED if attendance < 80%
+        enrollment.completion_status = CompletionStatus.FAILED
+    
+    db.commit()
+    db.refresh(enrollment)
+    
+    return {
+        "message": "Enrollment attendance and score updated successfully",
+        "enrollment_id": enrollment.id,
+        "attendance_percentage": round(enrollment.attendance_percentage, 1),
+        "completion_status": enrollment.completion_status.value,
+        "attendance_status": enrollment.attendance_status
+    }
 

@@ -117,6 +117,14 @@ export const completionsAPI = {
   },
   bulkUpdate: (data) => api.post('/completions/bulk', data),
   update: (id, data) => api.put(`/completions/${id}`, data),
+  updateEnrollmentAttendance: (enrollmentId, classesAttended, score) => {
+    return api.put(`/completions/enrollment/${enrollmentId}`, null, {
+      params: {
+        classes_attended: classesAttended,
+        score: score,
+      },
+    });
+  },
 };
 
 

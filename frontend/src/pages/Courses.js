@@ -25,7 +25,7 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete } from '@mui/icons-material';
+import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete, CheckCircle } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -68,6 +68,11 @@ function Courses() {
   const [attendanceScoresFile, setAttendanceScoresFile] = useState(null);
   const [attendanceScoresLoading, setAttendanceScoresLoading] = useState(false);
   const [attendanceScoresResults, setAttendanceScoresResults] = useState(null);
+  const [editAttendanceDialogOpen, setEditAttendanceDialogOpen] = useState(false);
+  const [selectedEnrollmentForEdit, setSelectedEnrollmentForEdit] = useState(null);
+  const [editClassesAttended, setEditClassesAttended] = useState('');
+  const [editScore, setEditScore] = useState('');
+  const [editAttendanceLoading, setEditAttendanceLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     batch_code: '',
@@ -76,7 +81,7 @@ function Courses() {
     end_date: null,
     seat_limit: 0,
     total_classes_offered: '',
-    prerequisite_course_id: '',
+    prerequisite_course_id: null,
   });
 
   useEffect(() => {
@@ -109,7 +114,7 @@ function Courses() {
       end_date: null,
       seat_limit: 0,
       total_classes_offered: '',
-      prerequisite_course_id: '',
+      prerequisite_course_id: null,
     });
   };
 
@@ -212,6 +217,73 @@ function Courses() {
     setWithdrawDialogOpen(false);
     setSelectedEnrollment(null);
     setWithdrawalReason('');
+  };
+
+  const handleEditAttendance = async () => {
+    if (!selectedEnrollmentForEdit) return;
+    
+    const classesAttended = parseInt(editClassesAttended);
+    const score = parseFloat(editScore);
+    
+    if (isNaN(classesAttended) || classesAttended < 0) {
+      setMessage({ type: 'error', text: 'Please enter a valid number of classes attended' });
+      return;
+    }
+    
+    if (isNaN(score) || score < 0 || score > 100) {
+      setMessage({ type: 'error', text: 'Please enter a valid score between 0 and 100' });
+      return;
+    }
+    
+    setEditAttendanceLoading(true);
+    try {
+      await completionsAPI.updateEnrollmentAttendance(
+        selectedEnrollmentForEdit.id,
+        classesAttended,
+        score
+      );
+      
+      setMessage({ type: 'success', text: 'Attendance and score updated successfully' });
+      setEditAttendanceDialogOpen(false);
+      setSelectedEnrollmentForEdit(null);
+      setEditClassesAttended('');
+      setEditScore('');
+      
+      // Refresh enrollments for the course
+      if (expandedCourse) {
+        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
+        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error updating attendance and score' });
+    } finally {
+      setEditAttendanceLoading(false);
+    }
+  };
+
+  const handleCloseEditAttendance = () => {
+    setEditAttendanceDialogOpen(false);
+    setSelectedEnrollmentForEdit(null);
+    setEditClassesAttended('');
+    setEditScore('');
+  };
+
+  const handleReapprove = async (enrollment) => {
+    try {
+      await enrollmentsAPI.reapprove(enrollment.id, 'Admin');
+      setMessage({ type: 'success', text: 'Student reapproved successfully' });
+      
+      // Refresh enrollments for the course
+      if (expandedCourse) {
+        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
+        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
+      }
+      
+      // Refresh courses to update seat counts
+      fetchCourses();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error reapproving student' });
+    }
   };
 
   const handleViewUserDetails = (enrollment) => {
@@ -685,6 +757,7 @@ function Courses() {
                                           <TableCell sx={{ fontWeight: 600 }}>Completion Status</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Score</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Attendance</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
@@ -729,6 +802,31 @@ function Courses() {
                                                   ? `${enrollment.attendance_percentage.toFixed(1)}%`
                                                   : enrollment.attendance_status || '-'}
                                               </TableCell>
+                                              <TableCell>
+                                                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                  <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => {
+                                                      setSelectedEnrollmentForEdit(enrollment);
+                                                      setEditClassesAttended(enrollment.present || '');
+                                                      setEditScore(enrollment.score || '');
+                                                      setEditAttendanceDialogOpen(true);
+                                                    }}
+                                                    title="Edit Attendance & Score"
+                                                  >
+                                                    <Edit fontSize="small" />
+                                                  </IconButton>
+                                                  <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => handleWithdraw(enrollment)}
+                                                    title="Withdraw Student"
+                                                  >
+                                                    <PersonRemove fontSize="small" />
+                                                  </IconButton>
+                                                </Box>
+                                              </TableCell>
                                             </TableRow>
                                           ))}
                                       </TableBody>
@@ -770,6 +868,7 @@ function Courses() {
                                           <TableCell sx={{ fontWeight: 600 }}>Eligibility</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Approval Status</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Reason</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
@@ -832,7 +931,24 @@ function Courses() {
                                                       Awaiting approval
                                                     </Typography>
                                                   )}
+                                                  {enrollment.approval_status === 'Withdrawn' && enrollment.rejection_reason && (
+                                                    <Typography variant="body2" color="error" sx={{ mb: 0.5 }}>
+                                                      <strong>Withdrawal:</strong> {enrollment.rejection_reason}
+                                                    </Typography>
+                                                  )}
                                                 </Box>
+                                              </TableCell>
+                                              <TableCell>
+                                                {enrollment.approval_status === 'Withdrawn' && (
+                                                  <IconButton
+                                                    size="small"
+                                                    color="success"
+                                                    onClick={() => handleReapprove(enrollment)}
+                                                    title="Reapprove Student"
+                                                  >
+                                                    <CheckCircle fontSize="small" />
+                                                  </IconButton>
+                                                )}
                                               </TableCell>
                                             </TableRow>
                                           ))}
@@ -926,6 +1042,25 @@ function Courses() {
               fullWidth
               inputProps={{ min: 1 }}
             />
+            <TextField
+              select
+              label="Prerequisite Course (Optional)"
+              value={formData.prerequisite_course_id || ''}
+              onChange={(e) => setFormData({ ...formData, prerequisite_course_id: e.target.value ? parseInt(e.target.value) : null })}
+              fullWidth
+              helperText="Select a course that students must have passed (completed) before enrolling in this course"
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {courses
+                .filter(c => !c.is_archived && c.id !== (formData.id || -1)) // Exclude archived and current course
+                .map((course) => (
+                  <MenuItem key={course.id} value={course.id}>
+                    {course.name} - {course.batch_code}
+                  </MenuItem>
+                ))}
+            </TextField>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1068,6 +1203,17 @@ function Courses() {
                 <Typography variant="body2" color="text.secondary">Total Classes Offered</Typography>
                 <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                   {selectedCourseForDetails.total_classes_offered || 'Not set'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">Prerequisite Course</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                  {selectedCourseForDetails.prerequisite_course_id 
+                    ? (() => {
+                        const prereqCourse = courses.find(c => c.id === selectedCourseForDetails.prerequisite_course_id);
+                        return prereqCourse ? `${prereqCourse.name} - ${prereqCourse.batch_code}` : 'Unknown';
+                      })()
+                    : 'None'}
                 </Typography>
               </Grid>
               {selectedCourseForDetails.description && (
@@ -1437,6 +1583,83 @@ function Courses() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseAttendanceScores}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Attendance & Score Dialog */}
+      <Dialog
+        open={editAttendanceDialogOpen}
+        onClose={handleCloseEditAttendance}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Update Attendance & Score</DialogTitle>
+        <DialogContent>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            {selectedEnrollmentForEdit && (
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Student:</strong> {selectedEnrollmentForEdit.student_name} ({selectedEnrollmentForEdit.student_employee_id})
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Course:</strong> {selectedEnrollmentForEdit.course_name} - {selectedEnrollmentForEdit.batch_code}
+                </Typography>
+                {expandedCourse && courses.find(c => c.id === expandedCourse)?.total_classes_offered && (
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Total Classes Offered:</strong> {courses.find(c => c.id === expandedCourse).total_classes_offered}
+                  </Typography>
+                )}
+              </>
+            )}
+            <TextField
+              label="Classes Attended"
+              type="number"
+              value={editClassesAttended}
+              onChange={(e) => setEditClassesAttended(e.target.value)}
+              fullWidth
+              required
+              inputProps={{ min: 0, max: expandedCourse ? courses.find(c => c.id === expandedCourse)?.total_classes_offered : undefined }}
+              helperText={expandedCourse && courses.find(c => c.id === expandedCourse)?.total_classes_offered 
+                ? `Maximum: ${courses.find(c => c.id === expandedCourse).total_classes_offered} classes`
+                : 'Enter the number of classes attended'}
+            />
+            <TextField
+              label="Score"
+              type="number"
+              value={editScore}
+              onChange={(e) => setEditScore(e.target.value)}
+              fullWidth
+              required
+              inputProps={{ min: 0, max: 100, step: 0.1 }}
+              helperText="Enter score (0-100). Completion status will be automatically updated based on 80% attendance threshold."
+            />
+            {editClassesAttended && expandedCourse && courses.find(c => c.id === expandedCourse)?.total_classes_offered && (
+              <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
+                Attendance: {((parseInt(editClassesAttended) || 0) / courses.find(c => c.id === expandedCourse).total_classes_offered * 100).toFixed(1)}%
+                {((parseInt(editClassesAttended) || 0) / courses.find(c => c.id === expandedCourse).total_classes_offered * 100) >= 80 
+                  ? ' (Will be marked as Completed)' 
+                  : ' (Will be marked as Failed)'}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditAttendance} disabled={editAttendanceLoading}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleEditAttendance} 
+            variant="contained"
+            disabled={editAttendanceLoading || !editClassesAttended || !editScore}
+          >
+            {editAttendanceLoading ? <CircularProgress size={24} /> : 'Update'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

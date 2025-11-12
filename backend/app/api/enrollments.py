@@ -70,12 +70,34 @@ def get_enrollments(
         enrollment_dict['course_description'] = enrollment.course.description if enrollment.course else None
         
         # Calculate overall completion rate for this student across all courses
+        # Only count courses that have a final outcome (completed, failed, or withdrawn)
+        # Exclude: pending approvals, not started, in progress, and rejected (admin's decision)
         all_student_enrollments = db.query(Enrollment).filter(
             Enrollment.student_id == enrollment.student_id
         ).all()
         
-        total_courses = len(all_student_enrollments)
-        completed_courses = sum(1 for e in all_student_enrollments if e.completion_status == CompletionStatus.COMPLETED)
+        # Filter enrollments to only include those that count toward completion rate:
+        # - COMPLETED or FAILED courses (completion_status) that are APPROVED
+        # - WITHDRAWN courses (approval_status) - these should be included as they have a reason
+        # Exclude: PENDING approvals, NOT_STARTED, IN_PROGRESS, REJECTED
+        relevant_enrollments = [
+            e for e in all_student_enrollments
+            if (
+                # Include withdrawn courses (they have a reason attached, count as not completed)
+                (e.approval_status == ApprovalStatus.WITHDRAWN)
+                # OR include completed/failed courses that are approved (not pending/rejected)
+                or (
+                    e.approval_status == ApprovalStatus.APPROVED
+                    and e.completion_status in [CompletionStatus.COMPLETED, CompletionStatus.FAILED]
+                )
+            )
+            # Exclude rejected enrollments (admin's decision, not student's fault)
+            and e.approval_status != ApprovalStatus.REJECTED
+        ]
+        
+        total_courses = len(relevant_enrollments)
+        # Only COMPLETED courses count as completed (withdrawn and failed count as not completed)
+        completed_courses = sum(1 for e in relevant_enrollments if e.completion_status == CompletionStatus.COMPLETED)
         
         if total_courses > 0:
             overall_completion_rate = (completed_courses / total_courses) * 100
@@ -139,12 +161,7 @@ def approve_enrollment(
         raise HTTPException(status_code=404, detail="Enrollment not found")
     
     if approval.approved:
-        # Only check eligibility when approving, not when rejecting
-        if enrollment.eligibility_status != "Eligible":
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Cannot approve enrollment with status: {enrollment.eligibility_status}"
-            )
+        # Allow approving even if ineligible (admin can override eligibility checks)
         # Check seat availability
         course = db.query(Course).filter(Course.id == enrollment.course_id).first()
         if course.current_enrolled >= course.seat_limit:
@@ -295,12 +312,8 @@ def reapprove_enrollment(
             detail=f"Cannot reapprove enrollment with status: {enrollment.approval_status}. Only withdrawn enrollments can be reapproved."
         )
     
-    # Check eligibility
-    if enrollment.eligibility_status != "Eligible":
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Cannot reapprove enrollment with eligibility status: {enrollment.eligibility_status}"
-        )
+    # Allow reapproving even if ineligible (admin can override eligibility checks)
+    # The eligibility_reason will still show why they're ineligible
     
     # Check seat availability
     course = db.query(Course).filter(Course.id == enrollment.course_id).first()
@@ -364,22 +377,27 @@ def create_enrollment(
         db, enrollment_data.student_id, enrollment_data.course_id
     )
     
-    # For manual enrollment, auto-approve if eligible
+    # For manual enrollment, auto-approve if eligible and seats available
+    # If ineligible, set to PENDING so admin can still manually approve if needed
     if eligibility_status == EligibilityStatus.ELIGIBLE:
         # Check seat availability before auto-approving
         if course.current_enrolled >= course.seat_limit:
-            raise HTTPException(status_code=400, detail="No available seats in this course")
-        
-        # Auto-approve manual enrollment
-        approval_status = ApprovalStatus.APPROVED
-        approved_by = "Admin (Manual Enrollment)"
-        approved_at = datetime.utcnow()
-        
-        # Update seat count
-        course.current_enrolled += 1
+            # No seats available, set to PENDING
+            approval_status = ApprovalStatus.PENDING
+            approved_by = None
+            approved_at = None
+        else:
+            # Auto-approve manual enrollment
+            approval_status = ApprovalStatus.APPROVED
+            approved_by = "Admin (Manual Enrollment)"
+            approved_at = datetime.utcnow()
+            
+            # Update seat count
+            course.current_enrolled += 1
     else:
-        # Not eligible, set to rejected
-        approval_status = ApprovalStatus.REJECTED
+        # Not eligible, set to PENDING so admin can manually approve if needed
+        # The eligibility_reason will show why they're ineligible
+        approval_status = ApprovalStatus.PENDING
         approved_by = None
         approved_at = None
     

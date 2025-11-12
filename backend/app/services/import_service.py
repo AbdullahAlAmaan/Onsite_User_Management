@@ -192,6 +192,8 @@ class ImportService:
                 )
                 
                 # Create enrollment record
+                # All enrollments start as PENDING (even if ineligible) so admin can manually approve if needed
+                # The eligibility_reason will show why they're ineligible
                 enrollment = Enrollment(
                     student_id=student.id,
                     course_id=course.id,
@@ -200,7 +202,7 @@ class ImportService:
                     eligibility_status=eligibility_status,
                     eligibility_reason=reason,
                     eligibility_checked_at=datetime.utcnow(),
-                    approval_status=ApprovalStatus.PENDING if eligibility_status == EligibilityStatus.ELIGIBLE else ApprovalStatus.REJECTED,
+                    approval_status=ApprovalStatus.PENDING,  # Always PENDING initially, admin can approve/reject manually
                     incoming_enrollment_id=incoming.id
                 )
                 db.add(enrollment)
