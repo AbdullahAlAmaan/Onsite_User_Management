@@ -4,12 +4,13 @@ Admin-only system for managing physical course enrollments with automated eligib
 
 ## Features
 
-- **Automated Enrollment Intake**: Manual Excel/CSV upload (Form submissions → staging → validation)
+- **Unified Course Management**: All course and enrollment management in one place
+- **Automated Enrollment Intake**: Manual Excel/CSV upload with automatic eligibility checks
 - **Eligibility Engine**: Three-tier validation (Prerequisites, Duplicates, Annual Limit)
-- **Admin Dashboard**: View all submissions, filtered eligible candidates, and approval workflow
-- **Course Management**: Admin creates and manages courses, batches, and seat limits
-- **Completion Tracking**: Score uploads with audit trails
-- **Reporting & Analytics**: Real-time dashboards with CSV/PDF exports
+- **Integrated Approval Workflow**: View and approve enrollments directly within course view
+- **Enrollment Sections**: Organized by status (Approved/Enrolled, Eligible Pending, Not Eligible, Withdrawn)
+- **Attendance & Completion Tracking**: Excel/CSV upload for attendance and scores with automatic completion status (80% threshold)
+- **User Management**: Complete employee profiles with course history and overall completion rates
 - **Admin Authentication**: Secure login with email/password authentication
 
 ## Tech Stack
@@ -125,9 +126,12 @@ Frontend will be available at: `http://localhost:3000`
 ### Quick Test
 
 1. Visit `http://localhost:3000`
-2. Go to "Courses" and create a test course
-3. Go to "Imports" and upload a sample Excel/CSV file
-4. Check "Enrollments" to see processed data
+2. Login with admin credentials
+3. Go to "Courses" and create a test course
+4. Upload enrollment Excel/CSV file from the course view
+5. View enrollments in the course (organized by status)
+6. Approve enrollments and manage attendance/scores
+7. Check "Users" tab to see employee course history
 
 ## Environment Variables
 
@@ -188,42 +192,92 @@ Once running, visit `http://localhost:8000/docs` for interactive API documentati
 
 ## Key Features Implemented
 
+✅ **Unified Course Management**
+- All course and enrollment management in one place
+- Course creation with prerequisites, seat limits, and total classes offered
+- Course archiving and permanent deletion
+- Course details card with prerequisite information
+
+✅ **Enrollment Management (Within Courses)**
+- **Approved/Enrolled Students**: All approved students with score, attendance, and completion status
+- **Eligible Enrollments (Pending)**: Pending eligible students ready for approval
+- **Not Eligible Enrollments**: All non-approved ineligible students (pending and rejected) with eligibility reasons
+- **Withdrawn Students**: All withdrawn students with reinstatement option
+- Manual enrollment with search functionality
+- Approve/Reject/Withdraw/Reapprove actions
+- Admin can approve ineligible students (override flexibility)
+
 ✅ **Enrollment Intake & Validation**
-- Manual Excel/CSV upload
-- Form submissions stored in staging table (`incoming_enrollments`)
+- Excel/CSV upload directly from course view
 - Automated eligibility checks (Prerequisites, Duplicates, Annual Limit)
-- Admin sees all submissions with eligibility status and reasons
+- All enrollments start as PENDING (even if ineligible)
+- Eligibility reasons displayed for admin review
 
-✅ **Admin Approval Workflow**
-- View all submissions (total signups)
-- Filter eligible candidates with reasoning
-- Bulk approval capabilities
-- Seat limit enforcement
-- Real-time seat counter
+✅ **Attendance & Completion Tracking**
+- Excel/CSV upload for attendance and scores (single file)
+- Automatic completion status calculation (80% attendance threshold)
+- Manual attendance/score update for individual students
+- Overall completion rate per student (across all courses)
+- Color-coded completion rates (Green ≥75%, Orange 60-75%, Red <60%)
 
-✅ **Course & Batch Management (Admin Only)**
-- Admin creates all courses
-- Course creation with prerequisites
-- Batch scheduling
-- Seat management
-- Auto-archiving (7 days post-completion)
+✅ **User Management**
+- Complete employee profiles with course history
+- Filter by "Never Taken Course" or "Has Taken Courses"
+- Overall completion rate display
+- Course history with attendance and completion status
+- Clickable employee IDs to view full details
 
-✅ **Completion Tracking**
-- Excel/CSV upload for scores
-- Attendance tracking
-- Audit trail for updates
-- Statistics calculation
+✅ **Data Preservation**
+- Course history preserved when course is deleted
+- Denormalized course_name and batch_code in enrollments
+- Enrollment history remains visible even after course deletion
 
-✅ **Reporting & Analytics**
-- Real-time dashboard KPIs
-- Summary reports with metrics
-- CSV/PDF exports
-- Filterable by course, SBU, status
+## Application Structure
+
+### Navigation Tabs
+
+1. **Courses** - Main page for all course and enrollment management
+   - Course list (Active/Archived toggle)
+   - Create/Edit/Delete courses
+   - Expand course to view enrollments organized by status
+   - Import enrollments (Excel/CSV)
+   - Upload attendance & scores (Excel/CSV)
+   - Manual student enrollment
+   - Course details card
+
+2. **Users** - Employee management and course history
+   - All employees list (sorted by employee ID)
+   - Course history per employee
+   - Filter by "Never Taken Course"
+   - Overall completion rate display
+   - Click employee ID to view full details
+
+### Enrollment Sections (Within Courses)
+
+When a course is expanded, enrollments are organized into:
+
+1. **Approved/Enrolled Students** - All approved students
+   - Shows: Completion Status, Score, Attendance, Overall Completion
+   - Actions: Edit Attendance & Score, Withdraw
+
+2. **Eligible Enrollments (Pending)** - Pending eligible students
+   - Actions: Approve, Reject
+
+3. **Not Eligible Enrollments** - All non-approved ineligible students
+   - Shows: Eligibility Reason, Approval Status (Pending/Rejected)
+   - Actions: Approve (Admin Override), Reject
+
+4. **Withdrawn Students** - All withdrawn students
+   - Shows: Withdrawal Reason
+   - Actions: Reinstate (Reapprove)
 
 ## Documentation
 
-- [Architecture Overview](ARCHITECTURE.md)
-- [Deployment Guide](DEPLOYMENT.md)
+- [Project Overview](PROJECT_OVERVIEW.md) - Detailed project structure and database schema
+- [Architecture Overview](ARCHITECTURE.md) - System architecture
+- [Deployment Guide](DEPLOYMENT.md) - Deployment instructions
+- [Excel Format Guide](EXCEL_FORMAT.md) - Excel file format requirements
+- [Security Audit](SECURITY_AUDIT.md) - Security audit report
 
 ## License
 

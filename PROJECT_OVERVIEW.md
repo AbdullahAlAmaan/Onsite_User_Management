@@ -189,7 +189,8 @@ Onsite_User_Management/
   - `POST /completions/upload` - Upload completion results
   - `POST /completions/bulk` - Bulk update completions
   - `PUT /completions/{id}` - Update single completion
-  - `POST /completions/attendance/upload` - Upload attendance & scores
+  - `POST /completions/attendance/upload` - Upload attendance & scores (single file)
+  - `PUT /completions/enrollment/{enrollment_id}` - Manual update of attendance and score for individual enrollment
 
 #### **`/app/services/`** - Business Logic Services
 - **`eligibility_service.py`** - Eligibility checking logic
@@ -288,33 +289,38 @@ Onsite_User_Management/
 
 #### **`/src/pages/`** - Page Components
 - **`Login.js`** - Admin login page
-- **`Courses.js`** - Course management page
-  - Course list (active/archived)
-  - Create/Edit/Delete courses
-  - Import enrollments (Excel/CSV)
-  - Upload attendance & scores
-  - Manual student enrollment
-  - Course details card
-  - View course enrollments
+  - Redirects to `/courses` after successful login
 
-- **`Enrollments.js`** - Enrollment management page
-  - Eligible enrollments section
-  - Not eligible enrollments section
+- **`Courses.js`** - Unified course and enrollment management page
+  - Course list with Active/Archived toggle
+  - Create/Edit/Delete courses (with prerequisites)
+  - Expand course to view enrollments organized by status:
+    - **Approved/Enrolled Students**: All approved students with score, attendance, completion status
+    - **Eligible Enrollments (Pending)**: Pending eligible students ready for approval
+    - **Not Eligible Enrollments**: All non-approved ineligible students (pending and rejected)
+    - **Withdrawn Students**: All withdrawn students with reinstatement option
+  - Import enrollments (Excel/CSV) - single file upload
+  - Upload attendance & scores (Excel/CSV) - single file with both attendance and scores
+  - Manual student enrollment with search functionality
+  - Course details card with prerequisite information
+  - Edit attendance & score for individual approved students
   - Approve/Reject/Withdraw/Reapprove actions
-  - Overall completion rate display
-  - Filters (SBU, eligibility status)
-  - User details dialog
 
 - **`Users.js`** - User management page
-  - All employees list
-  - Course history (expandable)
-  - Filter by "Never Taken Course"
-  - User details on click
+  - All employees list (sorted by employee ID)
+  - Course history (expandable) - last column
+  - Filter by "Never Taken Course" or "Has Taken Courses"
+  - Overall completion rate display (color-coded)
+  - Click employee ID to view full user details
+
+- **`Enrollments.js`** - (Deprecated - functionality moved to Courses.js)
+  - This file exists but is no longer used in the application
+  - All enrollment management is now in Courses.js
 
 #### **`/src/components/`** - Reusable Components
 - **`Layout.js`** - Main layout with navigation
-  - Sidebar navigation
-  - Header
+  - Sidebar navigation (Courses, Users)
+  - Header with logout
   - Protected route wrapper
 
 - **`PrivateRoute.js`** - Route protection component
@@ -620,8 +626,33 @@ alembic upgrade head
 ## 📈 Statistics
 
 - **Database Tables:** 3 main + 1 staging = 4 total
-- **API Endpoints:** ~25 endpoints
-- **Frontend Pages:** 4 pages (Login, Courses, Enrollments, Users)
+- **API Endpoints:** ~26 endpoints
+- **Frontend Pages:** 3 active pages (Login, Courses, Users) + 1 deprecated (Enrollments)
+- **Navigation Tabs:** 2 tabs (Courses, Users)
+- **Enrollment Sections:** 4 sections per course (Approved, Eligible Pending, Not Eligible, Withdrawn)
 - **Test Files:** 12 test files
 - **Database Migrations:** 4 migrations
+
+## 🎯 Key UI/UX Improvements
+
+1. **Unified Course Management**
+   - All course and enrollment operations in one place
+   - No need to switch between tabs for enrollment management
+   - Course-centric workflow matches admin mental model
+
+2. **Clear Enrollment Organization**
+   - Enrollments organized by status for easy review
+   - Approved students separated from pending approvals
+   - Ineligible students clearly visible with reasons
+
+3. **Flexible Admin Control**
+   - Can approve ineligible students if needed (admin override)
+   - Manual attendance/score updates for individual students
+   - Withdraw and reinstate capabilities
+
+4. **Better User Experience**
+   - Search functionality for manual enrollment (handles large lists)
+   - Color-coded completion rates for quick visual assessment
+   - Expandable course history in Users page
+   - Clickable employee IDs for quick access to details
 
