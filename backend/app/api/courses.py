@@ -11,10 +11,16 @@ router = APIRouter()
 @router.post("/", response_model=CourseResponse, status_code=201)
 def create_course(course: CourseCreate, db: Session = Depends(get_db)):
     """Create a new course batch."""
-    # Check for duplicate batch code
-    existing = db.query(Course).filter(Course.batch_code == course.batch_code).first()
+    # Check for duplicate batch code within the same course name
+    existing = db.query(Course).filter(
+        Course.name == course.name,
+        Course.batch_code == course.batch_code
+    ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Batch code already exists")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Batch code '{course.batch_code}' already exists for course '{course.name}'"
+        )
     
     # Check for overlapping batches if needed
     if course.start_date:
@@ -91,6 +97,24 @@ def update_course(
         raise HTTPException(status_code=404, detail="Course not found")
     
     update_data = course_update.dict(exclude_unset=True)
+    
+    # Check for duplicate batch code within the same course name if name or batch_code is being updated
+    if 'name' in update_data or 'batch_code' in update_data:
+        new_name = update_data.get('name', course.name)
+        new_batch_code = update_data.get('batch_code', course.batch_code)
+        
+        existing = db.query(Course).filter(
+            Course.id != course_id,  # Exclude current course
+            Course.name == new_name,
+            Course.batch_code == new_batch_code
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Batch code '{new_batch_code}' already exists for course '{new_name}'"
+            )
+    
     for field, value in update_data.items():
         setattr(course, field, value)
     

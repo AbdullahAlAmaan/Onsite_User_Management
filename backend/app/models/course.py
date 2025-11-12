@@ -1,14 +1,17 @@
-from sqlalchemy import Column, Integer, String, DateTime, Date, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Date, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 from datetime import datetime, date
 
 class Course(Base):
     __tablename__ = "courses"
+    __table_args__ = (
+        UniqueConstraint('name', 'batch_code', name='uq_course_name_batch_code'),
+    )
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
-    batch_code = Column(String, unique=True, index=True, nullable=False)
+    batch_code = Column(String, index=True, nullable=False)  # Not unique alone - unique with name
     description = Column(String, nullable=True)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)

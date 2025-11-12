@@ -91,9 +91,15 @@ class ImportService:
         return student
     
     @staticmethod
-    def get_course_by_batch_code(db: Session, batch_code: str) -> Optional[Course]:
-        """Get course by batch code."""
-        return db.query(Course).filter(Course.batch_code == batch_code).first()
+    def get_course_by_batch_code(db: Session, batch_code: str, course_name: Optional[str] = None) -> Optional[Course]:
+        """
+        Get course by batch code. If course_name is provided, matches both.
+        If course_name is not provided, returns the first match (for backward compatibility).
+        """
+        query = db.query(Course).filter(Course.batch_code == batch_code)
+        if course_name:
+            query = query.filter(Course.name == course_name)
+        return query.first()
     
     @staticmethod
     def find_student_by_employee_id_or_email(db: Session, employee_id: str, email: str) -> Optional[Student]:

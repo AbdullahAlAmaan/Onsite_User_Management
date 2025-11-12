@@ -39,7 +39,8 @@ def get_students(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
     
-    students = query.offset(skip).limit(limit).all()
+    # Sort by employee_id (ascending)
+    students = query.order_by(Student.employee_id.asc()).offset(skip).limit(limit).all()
     return [StudentResponse.from_orm(student) for student in students]
 
 @router.get("/{student_id}", response_model=StudentResponse)
@@ -107,7 +108,8 @@ def get_all_students_with_courses(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
     
-    students = query.offset(skip).limit(limit).all()
+    # Sort by employee_id (ascending) - EMP001, EMP002, EMP003, etc.
+    students = query.order_by(Student.employee_id.asc()).offset(skip).limit(limit).all()
     
     result = []
     for student in students:

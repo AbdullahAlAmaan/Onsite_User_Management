@@ -68,6 +68,14 @@ function Users() {
         filteredUsers = filteredUsers.filter(user => user.never_taken_course === false);
       }
       
+      // Sort by employee_id (ascending) - EMP001, EMP002, EMP003, etc.
+      filteredUsers.sort((a, b) => {
+        // Extract numeric part for proper sorting
+        const numA = parseInt(a.employee_id.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.employee_id.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+      
       setUsers(filteredUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
