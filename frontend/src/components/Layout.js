@@ -24,7 +24,6 @@ import api from '../services/api';
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Enrollments', icon: <PeopleIcon />, path: '/enrollments' },
   { text: 'Courses', icon: <SchoolIcon />, path: '/courses' },
   { text: 'Employees', icon: <PeopleIcon />, path: '/users' },
 ];

@@ -25,7 +25,7 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete, CheckCircle } from '@mui/icons-material';
+import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete, CheckCircle, Cancel } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -266,6 +266,44 @@ function Courses() {
     setSelectedEnrollmentForEdit(null);
     setEditClassesAttended('');
     setEditScore('');
+  };
+
+  const handleApprove = async (id) => {
+    try {
+      await enrollmentsAPI.approve({ enrollment_id: id, approved: true }, 'Admin');
+      setMessage({ type: 'success', text: 'Enrollment approved successfully' });
+      
+      // Refresh enrollments for the course
+      if (expandedCourse) {
+        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
+        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
+      }
+      
+      // Refresh courses to update seat counts
+      fetchCourses();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error approving enrollment' });
+    }
+  };
+
+  const handleReject = async (id) => {
+    try {
+      await enrollmentsAPI.approve(
+        { enrollment_id: id, approved: false, rejection_reason: 'Rejected by admin' },
+        'Admin'
+      );
+      setMessage({ type: 'success', text: 'Enrollment rejected' });
+      
+      // Refresh enrollments for the course
+      if (expandedCourse) {
+        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
+        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
+      }
+      
+      fetchCourses();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error rejecting enrollment' });
+    }
   };
 
   const handleReapprove = async (enrollment) => {
@@ -724,7 +762,7 @@ function Courses() {
                             </Box>
                           ) : courseEnrollments[course.id] && courseEnrollments[course.id].length > 0 ? (
                             <Box display="flex" flexDirection="column" gap={3}>
-                              {/* Approved Enrollments Section */}
+                              {/* Approved/Enrolled Students Section */}
                               {courseEnrollments[course.id].filter(e => e.approval_status === 'Approved').length > 0 && (
                                 <Box>
                                   <Typography 
@@ -732,24 +770,24 @@ function Courses() {
                                     gutterBottom
                                     sx={{ 
                                       mb: 2,
-                                      color: theme.palette.success.main,
+                                      color: theme.palette.primary.main,
                                       fontWeight: 600,
                                     }}
                                   >
-                                    Approved Students ({courseEnrollments[course.id].filter(e => e.approval_status === 'Approved').length})
+                                    Approved/Enrolled Students ({courseEnrollments[course.id].filter(e => e.approval_status === 'Approved').length})
                                   </Typography>
                                   <TableContainer 
                                     component={Paper} 
                                     variant="outlined"
                                     sx={{
                                       borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.success.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.success.main, 0.02),
+                                      border: `2px solid ${alpha(theme.palette.primary.main, 0.3)}`,
+                                      backgroundColor: alpha(theme.palette.primary.main, 0.02),
                                     }}
                                   >
                                     <Table size="small">
                                       <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.success.main, 0.1) }}>
+                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.1) }}>
                                           <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
@@ -757,6 +795,7 @@ function Courses() {
                                           <TableCell sx={{ fontWeight: 600 }}>Completion Status</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Score</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Attendance</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                                         </TableRow>
                                       </TableHead>
@@ -780,7 +819,21 @@ function Courses() {
                                                   {enrollment.student_employee_id || '-'}
                                                 </Typography>
                                               </TableCell>
-                                              <TableCell>{enrollment.student_name}</TableCell>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_name}
+                                                </Typography>
+                                              </TableCell>
                                               <TableCell>{enrollment.student_email}</TableCell>
                                               <TableCell>
                                                 <Chip label={enrollment.student_sbu} size="small" />
@@ -803,14 +856,35 @@ function Courses() {
                                                   : enrollment.attendance_status || '-'}
                                               </TableCell>
                                               <TableCell>
-                                                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                {(() => {
+                                                  const rate = enrollment.overall_completion_rate || 0;
+                                                  let color = 'error.main';
+                                                  if (rate >= 75) {
+                                                    color = 'success.main';
+                                                  } else if (rate >= 60) {
+                                                    color = 'warning.main';
+                                                  }
+                                                  return (
+                                                    <Typography
+                                                      sx={{
+                                                        color: color,
+                                                        fontWeight: 600,
+                                                      }}
+                                                    >
+                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
+                                                    </Typography>
+                                                  );
+                                                })()}
+                                              </TableCell>
+                                              <TableCell>
+                                                <Box display="flex" gap={1}>
                                                   <IconButton
                                                     size="small"
                                                     color="primary"
                                                     onClick={() => {
                                                       setSelectedEnrollmentForEdit(enrollment);
-                                                      setEditClassesAttended(enrollment.present || '');
-                                                      setEditScore(enrollment.score || '');
+                                                      setEditClassesAttended(enrollment.present != null ? String(enrollment.present) : '');
+                                                      setEditScore(enrollment.score != null ? String(enrollment.score) : '');
                                                       setEditAttendanceDialogOpen(true);
                                                     }}
                                                     title="Edit Attendance & Score"
@@ -835,45 +909,43 @@ function Courses() {
                                 </Box>
                               )}
 
-                              {/* Not Approved / Pending / Rejected Enrollments Section */}
-                              {courseEnrollments[course.id].filter(e => e.approval_status !== 'Approved').length > 0 && (
+                              {/* Eligible Enrollments (Pending) Section */}
+                              {courseEnrollments[course.id].filter(e => e.eligibility_status === 'Eligible' && e.approval_status === 'Pending').length > 0 && (
                                 <Box>
                                   <Typography 
                                     variant="h6" 
                                     gutterBottom
                                     sx={{ 
                                       mb: 2,
-                                      color: theme.palette.error.main,
+                                      color: theme.palette.success.main,
                                       fontWeight: 600,
                                     }}
                                   >
-                                    Not Approved / Pending ({courseEnrollments[course.id].filter(e => e.approval_status !== 'Approved').length})
+                                    Eligible Enrollments (Pending) ({courseEnrollments[course.id].filter(e => e.eligibility_status === 'Eligible' && e.approval_status === 'Pending').length})
                                   </Typography>
                                   <TableContainer 
                                     component={Paper} 
                                     variant="outlined"
                                     sx={{
                                       borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.error.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.error.main, 0.02),
+                                      border: `2px solid ${alpha(theme.palette.success.main, 0.3)}`,
+                                      backgroundColor: alpha(theme.palette.success.main, 0.02),
                                     }}
                                   >
                                     <Table size="small">
                                       <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.error.main, 0.1) }}>
+                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.success.main, 0.1) }}>
                                           <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Eligibility</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Approval Status</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Reason</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
                                         {courseEnrollments[course.id]
-                                          .filter(enrollment => enrollment.approval_status !== 'Approved')
+                                          .filter(enrollment => enrollment.eligibility_status === 'Eligible' && enrollment.approval_status === 'Pending')
                                           .map((enrollment) => (
                                             <TableRow key={enrollment.id} hover>
                                               <TableCell>
@@ -891,64 +963,373 @@ function Courses() {
                                                   {enrollment.student_employee_id || '-'}
                                                 </Typography>
                                               </TableCell>
-                                              <TableCell>{enrollment.student_name}</TableCell>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_name}
+                                                </Typography>
+                                              </TableCell>
                                               <TableCell>{enrollment.student_email}</TableCell>
                                               <TableCell>
                                                 <Chip label={enrollment.student_sbu} size="small" />
                                               </TableCell>
                                               <TableCell>
-                                                <Chip
-                                                  label={enrollment.eligibility_status}
-                                                  color={enrollment.eligibility_status === 'Eligible' ? 'success' : 'error'}
-                                                  size="small"
-                                                />
+                                                {(() => {
+                                                  const rate = enrollment.overall_completion_rate || 0;
+                                                  let color = 'error.main';
+                                                  if (rate >= 75) {
+                                                    color = 'success.main';
+                                                  } else if (rate >= 60) {
+                                                    color = 'warning.main';
+                                                  }
+                                                  return (
+                                                    <Typography
+                                                      sx={{
+                                                        color: color,
+                                                        fontWeight: 600,
+                                                      }}
+                                                    >
+                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
+                                                    </Typography>
+                                                  );
+                                                })()}
+                                              </TableCell>
+                                              <TableCell>
+                                                <Box display="flex" gap={1}>
+                                                  <IconButton
+                                                    size="small"
+                                                    color="success"
+                                                    onClick={() => handleApprove(enrollment.id)}
+                                                    title="Approve"
+                                                  >
+                                                    <CheckCircle fontSize="small" />
+                                                  </IconButton>
+                                                  <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => handleReject(enrollment.id)}
+                                                    title="Reject"
+                                                  >
+                                                    <Cancel fontSize="small" />
+                                                  </IconButton>
+                                                </Box>
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              )}
+
+                              {/* Not Eligible Enrollments Section */}
+                              {courseEnrollments[course.id].filter(e => e.eligibility_status !== 'Eligible' && e.approval_status !== 'Approved' && e.approval_status !== 'Withdrawn').length > 0 && (
+                                <Box>
+                                  <Typography 
+                                    variant="h6" 
+                                    gutterBottom
+                                    sx={{ 
+                                      mb: 2,
+                                      color: theme.palette.error.main,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Not Eligible Enrollments ({courseEnrollments[course.id].filter(e => e.eligibility_status !== 'Eligible' && e.approval_status !== 'Approved' && e.approval_status !== 'Withdrawn').length})
+                                  </Typography>
+                                  <TableContainer 
+                                    component={Paper} 
+                                    variant="outlined"
+                                    sx={{
+                                      borderRadius: 2,
+                                      border: `2px solid ${alpha(theme.palette.error.main, 0.3)}`,
+                                      backgroundColor: alpha(theme.palette.error.main, 0.02),
+                                    }}
+                                  >
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.error.main, 0.1) }}>
+                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Eligibility Reason</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Approval Status</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {courseEnrollments[course.id]
+                                          .filter(enrollment => enrollment.eligibility_status !== 'Eligible' && enrollment.approval_status !== 'Approved' && enrollment.approval_status !== 'Withdrawn')
+                                          .map((enrollment) => (
+                                            <TableRow key={enrollment.id} hover>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_employee_id || '-'}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_name}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>{enrollment.student_email}</TableCell>
+                                              <TableCell>
+                                                <Chip label={enrollment.student_sbu} size="small" />
+                                              </TableCell>
+                                              <TableCell>
+                                                <Box>
+                                                  <Chip
+                                                    label={enrollment.eligibility_status}
+                                                    color="error"
+                                                    size="small"
+                                                    sx={{ mb: enrollment.eligibility_reason ? 0.5 : 0 }}
+                                                  />
+                                                  {enrollment.eligibility_reason && (
+                                                    <Typography
+                                                      variant="caption"
+                                                      sx={{
+                                                        display: 'block',
+                                                        color: 'text.secondary',
+                                                        mt: 0.5,
+                                                        fontStyle: 'italic',
+                                                      }}
+                                                    >
+                                                      {enrollment.eligibility_reason}
+                                                    </Typography>
+                                                  )}
+                                                </Box>
                                               </TableCell>
                                               <TableCell>
                                                 <Chip
                                                   label={enrollment.approval_status}
                                                   color={
                                                     enrollment.approval_status === 'Pending' ? 'warning' :
-                                                    enrollment.approval_status === 'Rejected' ? 'error' :
-                                                    enrollment.approval_status === 'Withdrawn' ? 'error' : 'default'
+                                                    enrollment.approval_status === 'Rejected' ? 'error' : 'default'
                                                   }
                                                   size="small"
                                                 />
+                                                {enrollment.rejection_reason && enrollment.approval_status === 'Rejected' && (
+                                                  <Typography
+                                                    variant="caption"
+                                                    sx={{
+                                                      display: 'block',
+                                                      color: 'error.main',
+                                                      mt: 0.5,
+                                                      fontStyle: 'italic',
+                                                    }}
+                                                  >
+                                                    {enrollment.rejection_reason}
+                                                  </Typography>
+                                                )}
                                               </TableCell>
                                               <TableCell>
-                                                <Box>
-                                                  {enrollment.rejection_reason && (
-                                                    <Typography variant="body2" color="error" sx={{ mb: 0.5 }}>
-                                                      <strong>Rejection:</strong> {enrollment.rejection_reason}
+                                                {(() => {
+                                                  const rate = enrollment.overall_completion_rate || 0;
+                                                  let color = 'error.main';
+                                                  if (rate >= 75) {
+                                                    color = 'success.main';
+                                                  } else if (rate >= 60) {
+                                                    color = 'warning.main';
+                                                  }
+                                                  return (
+                                                    <Typography
+                                                      sx={{
+                                                        color: color,
+                                                        fontWeight: 600,
+                                                      }}
+                                                    >
+                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
                                                     </Typography>
+                                                  );
+                                                })()}
+                                              </TableCell>
+                                              <TableCell>
+                                                <Box display="flex" gap={1}>
+                                                  {enrollment.approval_status === 'Pending' && (
+                                                    <>
+                                                      <IconButton
+                                                        size="small"
+                                                        color="success"
+                                                        onClick={() => handleApprove(enrollment.id)}
+                                                        title="Approve (Admin Override)"
+                                                      >
+                                                        <CheckCircle fontSize="small" />
+                                                      </IconButton>
+                                                      <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => handleReject(enrollment.id)}
+                                                        title="Reject"
+                                                      >
+                                                        <Cancel fontSize="small" />
+                                                      </IconButton>
+                                                    </>
                                                   )}
-                                                  {enrollment.eligibility_reason && enrollment.eligibility_status !== 'Eligible' && (
-                                                    <Typography variant="body2" color="text.secondary">
-                                                      <strong>Eligibility:</strong> {enrollment.eligibility_reason}
-                                                    </Typography>
-                                                  )}
-                                                  {!enrollment.rejection_reason && !enrollment.eligibility_reason && enrollment.approval_status === 'Pending' && (
-                                                    <Typography variant="body2" color="text.secondary">
-                                                      Awaiting approval
-                                                    </Typography>
-                                                  )}
-                                                  {enrollment.approval_status === 'Withdrawn' && enrollment.rejection_reason && (
-                                                    <Typography variant="body2" color="error" sx={{ mb: 0.5 }}>
-                                                      <strong>Withdrawal:</strong> {enrollment.rejection_reason}
-                                                    </Typography>
+                                                  {enrollment.approval_status === 'Rejected' && (
+                                                    <IconButton
+                                                      size="small"
+                                                      color="success"
+                                                      onClick={() => handleApprove(enrollment.id)}
+                                                      title="Approve (Admin Override)"
+                                                    >
+                                                      <CheckCircle fontSize="small" />
+                                                    </IconButton>
                                                   )}
                                                 </Box>
                                               </TableCell>
+                                            </TableRow>
+                                          ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              )}
+
+                              {/* Withdrawn Students Section */}
+                              {courseEnrollments[course.id].filter(e => e.approval_status === 'Withdrawn').length > 0 && (
+                                <Box>
+                                  <Typography 
+                                    variant="h6" 
+                                    gutterBottom
+                                    sx={{ 
+                                      mb: 2,
+                                      color: theme.palette.warning.main,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Withdrawn Students ({courseEnrollments[course.id].filter(e => e.approval_status === 'Withdrawn').length})
+                                  </Typography>
+                                  <TableContainer 
+                                    component={Paper} 
+                                    variant="outlined"
+                                    sx={{
+                                      borderRadius: 2,
+                                      border: `2px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+                                      backgroundColor: alpha(theme.palette.warning.main, 0.02),
+                                    }}
+                                  >
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.warning.main, 0.1) }}>
+                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Withdrawal Reason</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {courseEnrollments[course.id]
+                                          .filter(enrollment => enrollment.approval_status === 'Withdrawn')
+                                          .map((enrollment) => (
+                                            <TableRow key={enrollment.id} hover>
                                               <TableCell>
-                                                {enrollment.approval_status === 'Withdrawn' && (
-                                                  <IconButton
-                                                    size="small"
-                                                    color="success"
-                                                    onClick={() => handleReapprove(enrollment)}
-                                                    title="Reapprove Student"
-                                                  >
-                                                    <CheckCircle fontSize="small" />
-                                                  </IconButton>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_employee_id || '-'}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_name}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>{enrollment.student_email}</TableCell>
+                                              <TableCell>
+                                                <Chip label={enrollment.student_sbu} size="small" />
+                                              </TableCell>
+                                              <TableCell>
+                                                {enrollment.rejection_reason ? (
+                                                  <Typography variant="body2" color="error">
+                                                    {enrollment.rejection_reason}
+                                                  </Typography>
+                                                ) : (
+                                                  <Typography variant="body2" color="text.secondary">
+                                                    No reason provided
+                                                  </Typography>
                                                 )}
+                                              </TableCell>
+                                              <TableCell>
+                                                {(() => {
+                                                  const rate = enrollment.overall_completion_rate || 0;
+                                                  let color = 'error.main';
+                                                  if (rate >= 75) {
+                                                    color = 'success.main';
+                                                  } else if (rate >= 60) {
+                                                    color = 'warning.main';
+                                                  }
+                                                  return (
+                                                    <Typography
+                                                      sx={{
+                                                        color: color,
+                                                        fontWeight: 600,
+                                                      }}
+                                                    >
+                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
+                                                    </Typography>
+                                                  );
+                                                })()}
+                                              </TableCell>
+                                              <TableCell>
+                                                <IconButton
+                                                  size="small"
+                                                  color="primary"
+                                                  onClick={() => handleReapprove(enrollment)}
+                                                  title="Reinstate Student"
+                                                >
+                                                  <CheckCircle fontSize="small" />
+                                                </IconButton>
                                               </TableCell>
                                             </TableRow>
                                           ))}
