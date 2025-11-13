@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import os
+import aiofiles
+from datetime import datetime
 from app.db.base import get_db
 from app.models.student import Student
 from app.schemas.student import StudentCreate, StudentResponse
+from app.core.file_utils import sanitize_filename, validate_file_extension, validate_file_size, get_safe_file_path
+from app.services.import_service import ImportService
 
 router = APIRouter()
 
@@ -23,6 +28,7 @@ def create_student(student: StudentCreate, db: Session = Depends(get_db)):
 @router.get("/", response_model=List[StudentResponse])
 def get_students(
     sbu: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(True, description="Filter by active status"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db)
@@ -31,6 +37,9 @@ def get_students(
     from app.core.validation import validate_sbu
     
     query = db.query(Student)
+    
+    # Filter by active status
+    query = query.filter(Student.is_active == is_active)
     
     if sbu:
         try:
@@ -127,6 +136,7 @@ def get_student_enrollments(student_id: int, db: Session = Depends(get_db)):
 @router.get("/all/with-courses", response_model=List[dict])
 def get_all_students_with_courses(
     sbu: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(True, description="Filter by active status"),
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, ge=1, le=10000),
     db: Session = Depends(get_db)
@@ -138,6 +148,9 @@ def get_all_students_with_courses(
     from app.core.validation import validate_sbu
     
     query = db.query(Student)
+    
+    # Filter by active status
+    query = query.filter(Student.is_active == is_active)
     
     if sbu:
         try:
@@ -186,4 +199,171 @@ def get_all_students_with_courses(
         result.append(student_dict)
     
     return result
+
+@router.post("/import/excel")
+async def import_employees_excel(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload and process Excel file with employee data."""
+    # Validate and sanitize filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+    
+    validate_file_extension(file.filename)
+    safe_filename = sanitize_filename(file.filename)
+    
+    # Read file content to check size
+    content = await file.read()
+    validate_file_size(len(content))
+    
+    # Reset file pointer
+    await file.seek(0)
+    
+    # Save uploaded file temporarily with safe path
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamped_filename = f"{timestamp}_{safe_filename}"
+    file_path = get_safe_file_path(timestamped_filename)
+    
+    async with aiofiles.open(file_path, 'wb') as out_file:
+        content = await file.read()
+        await out_file.write(content)
+    
+    try:
+        # Parse and process
+        records = ImportService.parse_employee_excel(file_path)
+        results = ImportService.process_employee_imports(db, records)
+        
+        return {
+            "message": "File processed successfully",
+            "results": results
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Don't expose internal error details
+        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
+    finally:
+        # Clean up local file
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+@router.post("/import/csv")
+async def import_employees_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload and process CSV file with employee data."""
+    # Validate and sanitize filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+    
+    validate_file_extension(file.filename)
+    safe_filename = sanitize_filename(file.filename)
+    
+    # Read file content to check size
+    content = await file.read()
+    validate_file_size(len(content))
+    
+    # Reset file pointer
+    await file.seek(0)
+    
+    # Save uploaded file temporarily with safe path
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamped_filename = f"{timestamp}_{safe_filename}"
+    file_path = get_safe_file_path(timestamped_filename)
+    
+    async with aiofiles.open(file_path, 'wb') as out_file:
+        content = await file.read()
+        await out_file.write(content)
+    
+    try:
+        records = ImportService.parse_employee_csv(file_path)
+        results = ImportService.process_employee_imports(db, records)
+        
+        return {
+            "message": "File processed successfully",
+            "results": results
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Don't expose internal error details
+        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
+    finally:
+        # Clean up local file
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+@router.post("/{student_id}/remove")
+def remove_student(
+    student_id: int,
+    db: Session = Depends(get_db)
+):
+    """Remove a student (mark as inactive). Preserves all course history and enrollments."""
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    if not student.is_active:
+        raise HTTPException(status_code=400, detail="Student is already removed")
+    
+    # Mark as inactive instead of deleting
+    student.is_active = False
+    db.commit()
+    db.refresh(student)
+    
+    return {
+        "message": "Student removed successfully",
+        "student_id": student.id,
+        "employee_id": student.employee_id,
+        "name": student.name
+    }
+
+@router.post("/{student_id}/restore")
+def restore_student(
+    student_id: int,
+    db: Session = Depends(get_db)
+):
+    """Restore a previously removed student (mark as active again)."""
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    if student.is_active:
+        raise HTTPException(status_code=400, detail="Student is already active")
+    
+    # Mark as active again
+    student.is_active = True
+    db.commit()
+    db.refresh(student)
+    
+    return {
+        "message": "Student restored successfully",
+        "student_id": student.id,
+        "employee_id": student.employee_id,
+        "name": student.name
+    }
+
+@router.get("/count")
+def get_student_count(
+    is_active: Optional[bool] = Query(True, description="Filter by active status"),
+    sbu: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get count of students."""
+    from app.core.validation import validate_sbu
+    
+    query = db.query(Student)
+    query = query.filter(Student.is_active == is_active)
+    
+    if sbu:
+        try:
+            validated_sbu = validate_sbu(sbu)
+            query = query.filter(Student.sbu == validated_sbu)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    
+    count = query.count()
+    return {"count": count, "is_active": is_active}
 

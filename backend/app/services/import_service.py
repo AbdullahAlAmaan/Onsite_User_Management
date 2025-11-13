@@ -225,4 +225,156 @@ class ImportService:
         
         db.commit()
         return results
+    
+    @staticmethod
+    def parse_employee_excel(file_path: str) -> List[Dict]:
+        """Parse Excel file and return list of employee records."""
+        try:
+            df = pd.read_excel(file_path)
+            # Normalize column names (handle variations)
+            df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+            
+            records = []
+            for _, row in df.iterrows():
+                record = {
+                    'employee_id': str(row.get('employee_id', '')).strip(),
+                    'name': str(row.get('name', '')).strip(),
+                    'email': str(row.get('email', '')).strip(),
+                    'sbu': str(row.get('sbu', '')).strip() if pd.notna(row.get('sbu')) else '',
+                    'designation': str(row.get('designation', '')).strip() if pd.notna(row.get('designation')) else '',
+                    'experience_years': int(row.get('experience_years', 0)) if pd.notna(row.get('experience_years')) else 0,
+                }
+                records.append(record)
+            
+            return records
+        except Exception as e:
+            raise ValueError(f"Error parsing Excel file: {str(e)}")
+    
+    @staticmethod
+    def parse_employee_csv(file_path: str) -> List[Dict]:
+        """Parse CSV file and return list of employee records."""
+        try:
+            df = pd.read_csv(file_path)
+            df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+            
+            records = []
+            for _, row in df.iterrows():
+                record = {
+                    'employee_id': str(row.get('employee_id', '')).strip(),
+                    'name': str(row.get('name', '')).strip(),
+                    'email': str(row.get('email', '')).strip(),
+                    'sbu': str(row.get('sbu', '')).strip() if pd.notna(row.get('sbu')) else '',
+                    'designation': str(row.get('designation', '')).strip() if pd.notna(row.get('designation')) else '',
+                    'experience_years': int(row.get('experience_years', 0)) if pd.notna(row.get('experience_years')) else 0,
+                }
+                records.append(record)
+            
+            return records
+        except Exception as e:
+            raise ValueError(f"Error parsing CSV file: {str(e)}")
+    
+    @staticmethod
+    def process_employee_imports(db: Session, records: List[Dict]) -> Dict:
+        """
+        Process employee import records:
+        1. Create new employees or update existing ones (by employee_id or email)
+        2. Update employee information if they already exist
+        """
+        results = {
+            'total': len(records),
+            'created': 0,
+            'updated': 0,
+            'errors': []
+        }
+        
+        for record in records:
+            try:
+                # Validate required fields
+                if not all([record.get('employee_id'), record.get('name'), record.get('email')]):
+                    results['errors'].append({
+                        'record': record,
+                        'error': 'Missing required fields (employee_id, name, email)'
+                    })
+                    continue
+                
+                # Check if employee exists by employee_id or email
+                existing_student = db.query(Student).filter(
+                    (Student.employee_id == record['employee_id']) | 
+                    (Student.email == record['email'])
+                ).first()
+                
+                if existing_student:
+                    # Update existing employee
+                    # If employee_id matches, update all fields
+                    # If only email matches, update employee_id and other fields
+                    if existing_student.employee_id != record['employee_id']:
+                        # Email match but different employee_id - check if new employee_id exists
+                        conflicting = db.query(Student).filter(
+                            Student.employee_id == record['employee_id']
+                        ).first()
+                        if conflicting:
+                            results['errors'].append({
+                                'record': record,
+                                'error': f"Employee ID {record['employee_id']} already exists for another employee"
+                            })
+                            continue
+                        existing_student.employee_id = record['employee_id']
+                    
+                    # Check if email is being changed to one that exists for another employee
+                    if existing_student.email != record['email']:
+                        email_conflict = db.query(Student).filter(
+                            Student.email == record['email'],
+                            Student.id != existing_student.id
+                        ).first()
+                        if email_conflict:
+                            results['errors'].append({
+                                'record': record,
+                                'error': f"Email {record['email']} already exists for another employee"
+                            })
+                            continue
+                    
+                    existing_student.name = record['name']
+                    existing_student.email = record['email']
+                    
+                    # Map SBU string to enum
+                    try:
+                        sbu_enum = SBU[record['sbu'].upper()] if record['sbu'].upper() in [e.name for e in SBU] else SBU.OTHER
+                    except:
+                        sbu_enum = SBU.OTHER
+                    existing_student.sbu = sbu_enum
+                    
+                    if record.get('designation'):
+                        existing_student.designation = record['designation']
+                    
+                    if record.get('experience_years') is not None:
+                        existing_student.experience_years = record['experience_years']
+                    
+                    results['updated'] += 1
+                else:
+                    # Create new employee
+                    # Map SBU string to enum
+                    try:
+                        sbu_enum = SBU[record['sbu'].upper()] if record['sbu'].upper() in [e.name for e in SBU] else SBU.OTHER
+                    except:
+                        sbu_enum = SBU.OTHER
+                    
+                    new_student = Student(
+                        employee_id=record['employee_id'],
+                        name=record['name'],
+                        email=record['email'],
+                        sbu=sbu_enum,
+                        designation=record.get('designation'),
+                        experience_years=record.get('experience_years', 0)
+                    )
+                    db.add(new_student)
+                    results['created'] += 1
+                
+            except Exception as e:
+                results['errors'].append({
+                    'record': record,
+                    'error': str(e)
+                })
+        
+        db.commit()
+        return results
 

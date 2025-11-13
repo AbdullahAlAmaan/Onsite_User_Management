@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 import enum
@@ -24,6 +24,7 @@ class Student(Base):
     sbu = Column(Enum(SBU), nullable=False)
     designation = Column(String, nullable=True)
     experience_years = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

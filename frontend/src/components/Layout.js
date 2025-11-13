@@ -17,15 +17,19 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import SchoolIcon from '@mui/icons-material/School';
 import PeopleIcon from '@mui/icons-material/People';
+import HistoryIcon from '@mui/icons-material/History';
 import LogoutIcon from '@mui/icons-material/Logout';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 
 const drawerWidth = 240;
 
 const menuItems = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Courses', icon: <SchoolIcon />, path: '/courses' },
   { text: 'Employees', icon: <PeopleIcon />, path: '/users' },
+  { text: 'Previous Employees', icon: <HistoryIcon />, path: '/previous-employees' },
 ];
 
 function Layout({ children }) {

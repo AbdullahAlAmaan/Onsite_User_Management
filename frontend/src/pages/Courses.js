@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -25,7 +25,7 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete, CheckCircle, Cancel } from '@mui/icons-material';
+import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete, CheckCircle, Cancel, Visibility, Download } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -58,6 +58,9 @@ function Courses() {
   const [importResults, setImportResults] = useState(null);
   const [courseDetailsCardOpen, setCourseDetailsCardOpen] = useState(false);
   const [selectedCourseForDetails, setSelectedCourseForDetails] = useState(null);
+  const [isEditingCourse, setIsEditingCourse] = useState(false);
+  const [editCourseData, setEditCourseData] = useState({});
+  const [editCourseLoading, setEditCourseLoading] = useState(false);
   const [manualEnrollDialogOpen, setManualEnrollDialogOpen] = useState(false);
   const [selectedCourseForEnroll, setSelectedCourseForEnroll] = useState(null);
   const [students, setStudents] = useState([]);
@@ -68,11 +71,36 @@ function Courses() {
   const [attendanceScoresFile, setAttendanceScoresFile] = useState(null);
   const [attendanceScoresLoading, setAttendanceScoresLoading] = useState(false);
   const [attendanceScoresResults, setAttendanceScoresResults] = useState(null);
+  const [showAttendancePreview, setShowAttendancePreview] = useState(false);
+  const [showEnrollmentPreview, setShowEnrollmentPreview] = useState(false);
+  
+  // Preview data for attendance & scores upload (from ADA2025A_completion.xlsx)
+  const attendancePreviewData = [
+    { bsid: 'EMP143', name: 'Casey Smith', email: 'casey.smith143@company.com', total_classes_attended: 30, score: 87 },
+    { bsid: 'EMP102', name: 'Morgan Williams', email: 'morgan.williams102@company.com', total_classes_attended: 29, score: 87 },
+    { bsid: 'EMP144', name: 'Reese Williams', email: 'reese.williams144@company.com', total_classes_attended: 24, score: 92 },
+    { bsid: 'EMP120', name: 'Skyler Moore', email: 'skyler.moore120@company.com', total_classes_attended: 30, score: 88 },
+    { bsid: 'EMP117', name: 'Taylor Davis', email: 'taylor.davis117@company.com', total_classes_attended: 30, score: 93 },
+  ];
+  
+  // Preview data for enrollment registration upload (from ADA2025A_registration.xlsx)
+  const enrollmentPreviewData = [
+    { employee_id: 'EMP143', name: 'Casey Smith', email: 'casey.smith143@company.com', sbu: 'Operations', designation: 'Engineer' },
+    { employee_id: 'EMP102', name: 'Morgan Williams', email: 'morgan.williams102@company.com', sbu: 'Marketing', designation: 'Engineer' },
+    { employee_id: 'EMP144', name: 'Reese Williams', email: 'reese.williams144@company.com', sbu: 'Operations', designation: 'Manager' },
+    { employee_id: 'EMP120', name: 'Skyler Moore', email: 'skyler.moore120@company.com', sbu: 'HR', designation: 'Engineer' },
+    { employee_id: 'EMP117', name: 'Taylor Davis', email: 'taylor.davis117@company.com', sbu: 'IT', designation: 'Engineer' },
+  ];
   const [editAttendanceDialogOpen, setEditAttendanceDialogOpen] = useState(false);
   const [selectedEnrollmentForEdit, setSelectedEnrollmentForEdit] = useState(null);
   const [editClassesAttended, setEditClassesAttended] = useState('');
   const [editScore, setEditScore] = useState('');
   const [editAttendanceLoading, setEditAttendanceLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSearchCourse, setSelectedSearchCourse] = useState(null);
+  const [startDateFilter, setStartDateFilter] = useState(null);
+  const [endDateFilter, setEndDateFilter] = useState(null);
+  const [selectedSBU, setSelectedSBU] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     batch_code: '',
@@ -99,6 +127,49 @@ function Courses() {
       setLoading(false);
     }
   };
+
+  // Filter courses based on search query and date filters
+  const filteredCourses = useMemo(() => {
+    let filtered = [...courses];
+    
+    // Filter by search query if provided (only if not using autocomplete selection)
+    if (searchQuery.trim() && !selectedSearchCourse) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(course => 
+        course.name?.toLowerCase().includes(query) ||
+        course.batch_code?.toLowerCase().includes(query)
+      );
+    } else if (selectedSearchCourse) {
+      // If a course is selected from autocomplete, show only that course
+      filtered = filtered.filter(course => course.id === selectedSearchCourse.id);
+    }
+    
+    // Filter by start date
+    if (startDateFilter) {
+      const filterDate = new Date(startDateFilter);
+      filterDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(course => {
+        if (!course.start_date) return false;
+        const courseDate = new Date(course.start_date);
+        courseDate.setHours(0, 0, 0, 0);
+        return courseDate >= filterDate;
+      });
+    }
+    
+    // Filter by end date
+    if (endDateFilter) {
+      const filterDate = new Date(endDateFilter);
+      filterDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(course => {
+        if (!course.end_date) return false;
+        const courseDate = new Date(course.end_date);
+        courseDate.setHours(23, 59, 59, 999);
+        return courseDate <= filterDate;
+      });
+    }
+    
+    return filtered;
+  }, [courses, searchQuery, selectedSearchCourse, startDateFilter, endDateFilter]);
 
   const handleOpen = () => {
     setOpen(true);
@@ -269,6 +340,9 @@ function Courses() {
   };
 
   const handleApprove = async (id) => {
+    // Save scroll position before approval
+    const scrollPosition = window.scrollY || window.pageYOffset;
+    
     try {
       await enrollmentsAPI.approve({ enrollment_id: id, approved: true }, 'Admin');
       setMessage({ type: 'success', text: 'Enrollment approved successfully' });
@@ -280,13 +354,29 @@ function Courses() {
       }
       
       // Refresh courses to update seat counts
-      fetchCourses();
+      await fetchCourses();
+      
+      // Restore scroll position after DOM updates
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPosition);
+        });
+      });
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Error approving enrollment' });
+      // Restore scroll position even on error
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPosition);
+        });
+      });
     }
   };
 
   const handleReject = async (id) => {
+    // Save scroll position before rejection
+    const scrollPosition = window.scrollY || window.pageYOffset;
+    
     try {
       await enrollmentsAPI.approve(
         { enrollment_id: id, approved: false, rejection_reason: 'Rejected by admin' },
@@ -300,13 +390,29 @@ function Courses() {
         setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
       }
       
-      fetchCourses();
+      await fetchCourses();
+      
+      // Restore scroll position after DOM updates
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPosition);
+        });
+      });
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Error rejecting enrollment' });
+      // Restore scroll position even on error
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPosition);
+        });
+      });
     }
   };
 
   const handleReapprove = async (enrollment) => {
+    // Save scroll position before reapproval
+    const scrollPosition = window.scrollY || window.pageYOffset;
+    
     try {
       await enrollmentsAPI.reapprove(enrollment.id, 'Admin');
       setMessage({ type: 'success', text: 'Student reapproved successfully' });
@@ -318,9 +424,22 @@ function Courses() {
       }
       
       // Refresh courses to update seat counts
-      fetchCourses();
+      await fetchCourses();
+      
+      // Restore scroll position after DOM updates
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPosition);
+        });
+      });
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Error reapproving student' });
+      // Restore scroll position even on error
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPosition);
+        });
+      });
     }
   };
 
@@ -409,7 +528,48 @@ function Courses() {
 
   const handleViewCourseInfo = (course) => {
     setSelectedCourseForDetails(course);
+    setEditCourseData({
+      name: course.name || '',
+      batch_code: course.batch_code || '',
+      description: course.description || '',
+      start_date: course.start_date ? new Date(course.start_date) : null,
+      end_date: course.end_date ? new Date(course.end_date) : null,
+      seat_limit: course.seat_limit || 0,
+      total_classes_offered: course.total_classes_offered || '',
+      prerequisite_course_id: course.prerequisite_course_id || null,
+    });
+    setIsEditingCourse(false);
     setCourseDetailsCardOpen(true);
+  };
+
+  const handleSaveCourseEdit = async () => {
+    if (!selectedCourseForDetails) return;
+    
+    setEditCourseLoading(true);
+    try {
+      const updateData = {
+        name: editCourseData.name || '',
+        batch_code: editCourseData.batch_code || '',
+        description: editCourseData.description || null,
+        start_date: editCourseData.start_date ? editCourseData.start_date.toISOString().split('T')[0] : null,
+        end_date: editCourseData.end_date ? editCourseData.end_date.toISOString().split('T')[0] : null,
+        seat_limit: parseInt(editCourseData.seat_limit) || 0,
+        total_classes_offered: editCourseData.total_classes_offered ? parseInt(editCourseData.total_classes_offered) : null,
+        prerequisite_course_id: editCourseData.prerequisite_course_id || null,
+      };
+      
+      await coursesAPI.update(selectedCourseForDetails.id, updateData);
+      setMessage({ type: 'success', text: 'Course updated successfully' });
+      setIsEditingCourse(false);
+      fetchCourses();
+      // Update the selected course details
+      const updatedCourse = { ...selectedCourseForDetails, ...updateData };
+      setSelectedCourseForDetails(updatedCourse);
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error updating course' });
+    } finally {
+      setEditCourseLoading(false);
+    }
   };
 
   const handleOpenManualEnroll = async (course) => {
@@ -636,16 +796,154 @@ function Courses() {
           <CircularProgress />
         </Box>
       ) : (
-        <Card
-          sx={{
-            borderRadius: 3,
-            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-            overflow: 'hidden',
-          }}
-        >
-          <TableContainer>
-            <Table>
+        <>
+          {/* Search and Filter Section */}
+          <Card
+            sx={{
+              borderRadius: 3,
+              boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              mb: 3,
+            }}
+          >
+            <CardContent>
+              <Box display="flex" gap={2} flexWrap="wrap">
+                <Autocomplete
+                  options={courses}
+                  getOptionLabel={(option) => option ? `${option.name} (${option.batch_code})` : ''}
+                  value={selectedSearchCourse}
+                  onChange={(event, newValue) => {
+                    setSelectedSearchCourse(newValue);
+                    if (newValue) {
+                      setSearchQuery(newValue.name || '');
+                    } else {
+                      setSearchQuery('');
+                    }
+                  }}
+                  onInputChange={(event, newInputValue) => {
+                    setSearchQuery(newInputValue);
+                    if (!newInputValue) {
+                      setSelectedSearchCourse(null);
+                    }
+                  }}
+                  inputValue={searchQuery}
+                  filterOptions={(options, { inputValue }) => {
+                    if (!inputValue) return [];
+                    const searchLower = inputValue.toLowerCase();
+                    return options.filter((course) =>
+                      course.name?.toLowerCase().includes(searchLower) ||
+                      course.batch_code?.toLowerCase().includes(searchLower)
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Search Courses"
+                      placeholder="Search by name or batch code..."
+                      size="small"
+                      sx={{ minWidth: 300, flexGrow: 1 }}
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <>
+                            <InputAdornment position="start">
+                              <Search sx={{ color: 'text.secondary' }} />
+                            </InputAdornment>
+                            {params.InputProps.startAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                  renderOption={(props, course) => (
+                    <Box component="li" {...props} key={course.id}>
+                      <Box>
+                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                          {course.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {course.batch_code} {course.start_date && `• ${course.start_date}`}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                  noOptionsText="No courses found"
+                  clearOnEscape
+                  clearOnBlur={false}
+                />
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <DatePicker
+                    label="Start Date (From)"
+                    value={startDateFilter}
+                    onChange={(newValue) => setStartDateFilter(newValue)}
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        sx: { minWidth: 200 },
+                      },
+                    }}
+                    views={['year', 'month', 'day']}
+                  />
+                  <DatePicker
+                    label="End Date (To)"
+                    value={endDateFilter}
+                    onChange={(newValue) => setEndDateFilter(newValue)}
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        sx: { minWidth: 200 },
+                      },
+                    }}
+                    views={['year', 'month', 'day']}
+                  />
+                </LocalizationProvider>
+                <TextField
+                  select
+                  label="SBU"
+                  value={selectedSBU}
+                  onChange={(e) => setSelectedSBU(e.target.value)}
+                  size="small"
+                  sx={{ minWidth: 150 }}
+                >
+                  <MenuItem value="">All SBUs</MenuItem>
+                  <MenuItem value="IT">IT</MenuItem>
+                  <MenuItem value="HR">HR</MenuItem>
+                  <MenuItem value="Finance">Finance</MenuItem>
+                  <MenuItem value="Operations">Operations</MenuItem>
+                  <MenuItem value="Sales">Sales</MenuItem>
+                  <MenuItem value="Marketing">Marketing</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </TextField>
+                {(startDateFilter || endDateFilter || searchQuery || selectedSBU) && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      setStartDateFilter(null);
+                      setEndDateFilter(null);
+                      setSearchQuery('');
+                      setSelectedSearchCourse(null);
+                      setSelectedSBU('');
+                    }}
+                    sx={{ alignSelf: 'flex-start', mt: 0.5 }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+
+          <Card
+            sx={{
+              borderRadius: 3,
+              boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              overflow: 'hidden',
+            }}
+          >
+            <TableContainer>
+              <Table>
             <TableHead>
               <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
                 <TableCell width={50}></TableCell>
@@ -659,7 +957,7 @@ function Courses() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {courses.map((course) => (
+              {filteredCourses.map((course) => (
                 <React.Fragment key={course.id}>
                   <TableRow
                     sx={{
@@ -763,7 +1061,11 @@ function Courses() {
                           ) : courseEnrollments[course.id] && courseEnrollments[course.id].length > 0 ? (
                             <Box display="flex" flexDirection="column" gap={3}>
                               {/* Approved/Enrolled Students Section */}
-                              {courseEnrollments[course.id].filter(e => e.approval_status === 'Approved').length > 0 && (
+                              {courseEnrollments[course.id].filter(e => {
+                                if (e.approval_status !== 'Approved') return false;
+                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                return true;
+                              }).length > 0 && (
                                 <Box>
                                   <Typography 
                                     variant="h6" 
@@ -774,7 +1076,11 @@ function Courses() {
                                       fontWeight: 600,
                                     }}
                                   >
-                                    Approved/Enrolled Students ({courseEnrollments[course.id].filter(e => e.approval_status === 'Approved').length})
+                                    Approved/Enrolled Students ({courseEnrollments[course.id].filter(e => {
+                                      if (e.approval_status !== 'Approved') return false;
+                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                      return true;
+                                    }).length})
                                   </Typography>
                                   <TableContainer 
                                     component={Paper} 
@@ -801,7 +1107,11 @@ function Courses() {
                                       </TableHead>
                                       <TableBody>
                                         {courseEnrollments[course.id]
-                                          .filter(enrollment => enrollment.approval_status === 'Approved')
+                                          .filter(enrollment => {
+                                            if (enrollment.approval_status !== 'Approved') return false;
+                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
+                                            return true;
+                                          })
                                           .map((enrollment) => (
                                             <TableRow key={enrollment.id} hover>
                                               <TableCell>
@@ -909,43 +1219,61 @@ function Courses() {
                                 </Box>
                               )}
 
-                              {/* Eligible Enrollments (Pending) Section */}
-                              {courseEnrollments[course.id].filter(e => e.eligibility_status === 'Eligible' && e.approval_status === 'Pending').length > 0 && (
+                              {/* Withdrawn Students Section */}
+                              {courseEnrollments[course.id].filter(e => {
+                                if (e.approval_status !== 'Withdrawn') return false;
+                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                return true;
+                              }).length > 0 && (
                                 <Box>
                                   <Typography 
                                     variant="h6" 
                                     gutterBottom
                                     sx={{ 
                                       mb: 2,
-                                      color: theme.palette.success.main,
+                                      color: theme.palette.warning.main,
                                       fontWeight: 600,
                                     }}
                                   >
-                                    Eligible Enrollments (Pending) ({courseEnrollments[course.id].filter(e => e.eligibility_status === 'Eligible' && e.approval_status === 'Pending').length})
+                                    Withdrawn Students ({courseEnrollments[course.id].filter(e => {
+                                      if (e.approval_status !== 'Withdrawn') return false;
+                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                      return true;
+                                    }).length})
                                   </Typography>
                                   <TableContainer 
                                     component={Paper} 
                                     variant="outlined"
                                     sx={{
                                       borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.success.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.success.main, 0.02),
+                                      border: `2px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+                                      backgroundColor: alpha(theme.palette.warning.main, 0.02),
                                     }}
                                   >
                                     <Table size="small">
                                       <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.success.main, 0.1) }}>
+                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.warning.main, 0.1) }}>
                                           <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Withdrawal Reason</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>
+                                            <Box display="flex" alignItems="center" gap={0.5}>
+                                              <Add fontSize="small" />
+                                              Add
+                                            </Box>
+                                          </TableCell>
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
                                         {courseEnrollments[course.id]
-                                          .filter(enrollment => enrollment.eligibility_status === 'Eligible' && enrollment.approval_status === 'Pending')
+                                          .filter(enrollment => {
+                                            if (enrollment.approval_status !== 'Withdrawn') return false;
+                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
+                                            return true;
+                                          })
                                           .map((enrollment) => (
                                             <TableRow key={enrollment.id} hover>
                                               <TableCell>
@@ -983,6 +1311,17 @@ function Courses() {
                                                 <Chip label={enrollment.student_sbu} size="small" />
                                               </TableCell>
                                               <TableCell>
+                                                {enrollment.rejection_reason ? (
+                                                  <Typography variant="body2" color="error">
+                                                    {enrollment.rejection_reason}
+                                                  </Typography>
+                                                ) : (
+                                                  <Typography variant="body2" color="text.secondary">
+                                                    No reason provided
+                                                  </Typography>
+                                                )}
+                                              </TableCell>
+                                              <TableCell>
                                                 {(() => {
                                                   const rate = enrollment.overall_completion_rate || 0;
                                                   let color = 'error.main';
@@ -1004,24 +1343,14 @@ function Courses() {
                                                 })()}
                                               </TableCell>
                                               <TableCell>
-                                                <Box display="flex" gap={1}>
-                                                  <IconButton
-                                                    size="small"
-                                                    color="success"
-                                                    onClick={() => handleApprove(enrollment.id)}
-                                                    title="Approve"
-                                                  >
-                                                    <CheckCircle fontSize="small" />
-                                                  </IconButton>
-                                                  <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => handleReject(enrollment.id)}
-                                                    title="Reject"
-                                                  >
-                                                    <Cancel fontSize="small" />
-                                                  </IconButton>
-                                                </Box>
+                                                <IconButton
+                                                  size="small"
+                                                  color="success"
+                                                  onClick={() => handleReapprove(enrollment)}
+                                                  title="Reapprove Student"
+                                                >
+                                                  <PersonAdd fontSize="small" />
+                                                </IconButton>
                                               </TableCell>
                                             </TableRow>
                                           ))}
@@ -1032,7 +1361,11 @@ function Courses() {
                               )}
 
                               {/* Not Eligible Enrollments Section */}
-                              {courseEnrollments[course.id].filter(e => e.eligibility_status !== 'Eligible' && e.approval_status !== 'Approved' && e.approval_status !== 'Withdrawn').length > 0 && (
+                              {courseEnrollments[course.id].filter(e => {
+                                if (e.eligibility_status === 'Eligible' || e.approval_status === 'Approved' || e.approval_status === 'Withdrawn') return false;
+                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                return true;
+                              }).length > 0 && (
                                 <Box>
                                   <Typography 
                                     variant="h6" 
@@ -1043,7 +1376,11 @@ function Courses() {
                                       fontWeight: 600,
                                     }}
                                   >
-                                    Not Eligible Enrollments ({courseEnrollments[course.id].filter(e => e.eligibility_status !== 'Eligible' && e.approval_status !== 'Approved' && e.approval_status !== 'Withdrawn').length})
+                                    Not Eligible Enrollments ({courseEnrollments[course.id].filter(e => {
+                                      if (e.eligibility_status === 'Eligible' || e.approval_status === 'Approved' || e.approval_status === 'Withdrawn') return false;
+                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                      return true;
+                                    }).length})
                                   </Typography>
                                   <TableContainer 
                                     component={Paper} 
@@ -1064,12 +1401,21 @@ function Courses() {
                                           <TableCell sx={{ fontWeight: 600 }}>Eligibility Reason</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Approval Status</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>
+                                            <Box display="flex" alignItems="center" gap={0.5}>
+                                              <Add fontSize="small" />
+                                              Add
+                                            </Box>
+                                          </TableCell>
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
                                         {courseEnrollments[course.id]
-                                          .filter(enrollment => enrollment.eligibility_status !== 'Eligible' && enrollment.approval_status !== 'Approved' && enrollment.approval_status !== 'Withdrawn')
+                                          .filter(enrollment => {
+                                            if (enrollment.eligibility_status === 'Eligible' || enrollment.approval_status === 'Approved' || enrollment.approval_status === 'Withdrawn') return false;
+                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
+                                            return true;
+                                          })
                                           .map((enrollment) => (
                                             <TableRow key={enrollment.id} hover>
                                               <TableCell>
@@ -1215,44 +1561,55 @@ function Courses() {
                                 </Box>
                               )}
 
-                              {/* Withdrawn Students Section */}
-                              {courseEnrollments[course.id].filter(e => e.approval_status === 'Withdrawn').length > 0 && (
+                              {/* Eligible Enrollments (Pending) Section */}
+                              {courseEnrollments[course.id].filter(e => {
+                                if (e.eligibility_status !== 'Eligible' || e.approval_status !== 'Pending') return false;
+                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                return true;
+                              }).length > 0 && (
                                 <Box>
                                   <Typography 
                                     variant="h6" 
                                     gutterBottom
                                     sx={{ 
                                       mb: 2,
-                                      color: theme.palette.warning.main,
+                                      color: theme.palette.success.main,
                                       fontWeight: 600,
                                     }}
                                   >
-                                    Withdrawn Students ({courseEnrollments[course.id].filter(e => e.approval_status === 'Withdrawn').length})
+                                    Eligible Enrollments (Pending) ({courseEnrollments[course.id].filter(e => {
+                                      if (e.eligibility_status !== 'Eligible' || e.approval_status !== 'Pending') return false;
+                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                      return true;
+                                    }).length})
                                   </Typography>
                                   <TableContainer 
                                     component={Paper} 
                                     variant="outlined"
                                     sx={{
                                       borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.warning.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.warning.main, 0.02),
+                                      border: `2px solid ${alpha(theme.palette.success.main, 0.3)}`,
+                                      backgroundColor: alpha(theme.palette.success.main, 0.02),
                                     }}
                                   >
                                     <Table size="small">
                                       <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.warning.main, 0.1) }}>
+                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.success.main, 0.1) }}>
                                           <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Withdrawal Reason</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
                                         {courseEnrollments[course.id]
-                                          .filter(enrollment => enrollment.approval_status === 'Withdrawn')
+                                          .filter(enrollment => {
+                                            if (enrollment.eligibility_status !== 'Eligible' || enrollment.approval_status !== 'Pending') return false;
+                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
+                                            return true;
+                                          })
                                           .map((enrollment) => (
                                             <TableRow key={enrollment.id} hover>
                                               <TableCell>
@@ -1290,17 +1647,6 @@ function Courses() {
                                                 <Chip label={enrollment.student_sbu} size="small" />
                                               </TableCell>
                                               <TableCell>
-                                                {enrollment.rejection_reason ? (
-                                                  <Typography variant="body2" color="error">
-                                                    {enrollment.rejection_reason}
-                                                  </Typography>
-                                                ) : (
-                                                  <Typography variant="body2" color="text.secondary">
-                                                    No reason provided
-                                                  </Typography>
-                                                )}
-                                              </TableCell>
-                                              <TableCell>
                                                 {(() => {
                                                   const rate = enrollment.overall_completion_rate || 0;
                                                   let color = 'error.main';
@@ -1322,14 +1668,24 @@ function Courses() {
                                                 })()}
                                               </TableCell>
                                               <TableCell>
-                                                <IconButton
-                                                  size="small"
-                                                  color="primary"
-                                                  onClick={() => handleReapprove(enrollment)}
-                                                  title="Reinstate Student"
-                                                >
-                                                  <CheckCircle fontSize="small" />
-                                                </IconButton>
+                                                <Box display="flex" gap={1}>
+                                                  <IconButton
+                                                    size="small"
+                                                    color="success"
+                                                    onClick={() => handleApprove(enrollment.id)}
+                                                    title="Approve"
+                                                  >
+                                                    <CheckCircle fontSize="small" />
+                                                  </IconButton>
+                                                  <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => handleReject(enrollment.id)}
+                                                    title="Reject"
+                                                  >
+                                                    <Cancel fontSize="small" />
+                                                  </IconButton>
+                                                </Box>
                                               </TableCell>
                                             </TableRow>
                                           ))}
@@ -1354,6 +1710,7 @@ function Courses() {
           </Table>
         </TableContainer>
         </Card>
+        </>
       )}
 
       <Dialog 
@@ -1522,8 +1879,11 @@ function Courses() {
       <Dialog
         open={courseDetailsCardOpen}
         onClose={() => {
-          setCourseDetailsCardOpen(false);
-          setSelectedCourseForDetails(null);
+          if (!isEditingCourse) {
+            setCourseDetailsCardOpen(false);
+            setSelectedCourseForDetails(null);
+            setIsEditingCourse(false);
+          }
         }}
         maxWidth="md"
         fullWidth
@@ -1534,39 +1894,107 @@ function Courses() {
           }
         }}
       >
-        <DialogTitle sx={{ fontWeight: 600 }}>Course Details</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Course Details
+          {!isEditingCourse && (
+            <Button
+              startIcon={<Edit />}
+              variant="outlined"
+              size="small"
+              onClick={() => setIsEditingCourse(true)}
+              sx={{ textTransform: 'none' }}
+            >
+              Edit
+            </Button>
+          )}
+        </DialogTitle>
         <DialogContent>
           {selectedCourseForDetails && (
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">Course Name</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.name}
-                </Typography>
+                {isEditingCourse ? (
+                  <TextField
+                    value={editCourseData.name}
+                    onChange={(e) => setEditCourseData({ ...editCourseData, name: e.target.value })}
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                    required
+                  />
+                ) : (
+                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                    {selectedCourseForDetails.name}
+                  </Typography>
+                )}
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">Batch Code</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.batch_code}
-                </Typography>
+                {isEditingCourse ? (
+                  <TextField
+                    value={editCourseData.batch_code}
+                    onChange={(e) => setEditCourseData({ ...editCourseData, batch_code: e.target.value })}
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                    required
+                  />
+                ) : (
+                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                    {selectedCourseForDetails.batch_code}
+                  </Typography>
+                )}
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">Start Date</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.start_date || '-'}
-                </Typography>
+                {isEditingCourse ? (
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <DatePicker
+                      value={editCourseData.start_date}
+                      onChange={(newValue) => setEditCourseData({ ...editCourseData, start_date: newValue })}
+                      slotProps={{ textField: { size: 'small', fullWidth: true, sx: { mt: 1 } } }}
+                    />
+                  </LocalizationProvider>
+                ) : (
+                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                    {selectedCourseForDetails.start_date || '-'}
+                  </Typography>
+                )}
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">End Date</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.end_date || '-'}
-                </Typography>
+                {isEditingCourse ? (
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <DatePicker
+                      value={editCourseData.end_date}
+                      onChange={(newValue) => setEditCourseData({ ...editCourseData, end_date: newValue })}
+                      slotProps={{ textField: { size: 'small', fullWidth: true, sx: { mt: 1 } } }}
+                    />
+                  </LocalizationProvider>
+                ) : (
+                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                    {selectedCourseForDetails.end_date || '-'}
+                  </Typography>
+                )}
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">Seat Limit</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.seat_limit}
-                </Typography>
+                {isEditingCourse ? (
+                  <TextField
+                    type="number"
+                    value={editCourseData.seat_limit}
+                    onChange={(e) => setEditCourseData({ ...editCourseData, seat_limit: e.target.value })}
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                    inputProps={{ min: selectedCourseForDetails.current_enrolled }}
+                    helperText={`Currently enrolled: ${selectedCourseForDetails.current_enrolled}`}
+                  />
+                ) : (
+                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                    {selectedCourseForDetails.seat_limit}
+                  </Typography>
+                )}
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">Currently Enrolled</Typography>
@@ -1582,39 +2010,115 @@ function Courses() {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">Total Classes Offered</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.total_classes_offered || 'Not set'}
-                </Typography>
+                {isEditingCourse ? (
+                  <TextField
+                    type="number"
+                    value={editCourseData.total_classes_offered}
+                    onChange={(e) => setEditCourseData({ ...editCourseData, total_classes_offered: e.target.value })}
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                    inputProps={{ min: 1 }}
+                    placeholder="Enter total classes"
+                  />
+                ) : (
+                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                    {selectedCourseForDetails.total_classes_offered || 'Not set'}
+                  </Typography>
+                )}
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">Prerequisite Course</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.prerequisite_course_id 
-                    ? (() => {
-                        const prereqCourse = courses.find(c => c.id === selectedCourseForDetails.prerequisite_course_id);
-                        return prereqCourse ? `${prereqCourse.name} - ${prereqCourse.batch_code}` : 'Unknown';
-                      })()
-                    : 'None'}
-                </Typography>
-              </Grid>
-              {selectedCourseForDetails.description && (
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="text.secondary">Description</Typography>
+                {isEditingCourse ? (
+                  <TextField
+                    select
+                    value={editCourseData.prerequisite_course_id || ''}
+                    onChange={(e) => setEditCourseData({ ...editCourseData, prerequisite_course_id: e.target.value ? parseInt(e.target.value) : null })}
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    {courses
+                      .filter(c => c.id !== selectedCourseForDetails.id && !c.is_archived)
+                      .map((course) => (
+                        <MenuItem key={course.id} value={course.id}>
+                          {course.name} - {course.batch_code}
+                        </MenuItem>
+                      ))}
+                  </TextField>
+                ) : (
                   <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.description}
+                    {selectedCourseForDetails.prerequisite_course_id 
+                      ? (() => {
+                          const prereqCourse = courses.find(c => c.id === selectedCourseForDetails.prerequisite_course_id);
+                          return prereqCourse ? `${prereqCourse.name} - ${prereqCourse.batch_code}` : 'Unknown';
+                        })()
+                      : 'None'}
                   </Typography>
-                </Grid>
-              )}
+                )}
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.secondary">Description</Typography>
+                {isEditingCourse ? (
+                  <TextField
+                    multiline
+                    rows={4}
+                    value={editCourseData.description}
+                    onChange={(e) => setEditCourseData({ ...editCourseData, description: e.target.value })}
+                    fullWidth
+                    sx={{ mt: 1 }}
+                    placeholder="Enter course description"
+                  />
+                ) : (
+                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                    {selectedCourseForDetails.description || 'No description'}
+                  </Typography>
+                )}
+              </Grid>
             </Grid>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {
-            setCourseDetailsCardOpen(false);
-            setSelectedCourseForDetails(null);
-          }}>
-            Close
-          </Button>
+          {isEditingCourse ? (
+            <>
+              <Button 
+                onClick={() => {
+                  setIsEditingCourse(false);
+                  // Reset to original values
+                  setEditCourseData({
+                    name: selectedCourseForDetails.name || '',
+                    batch_code: selectedCourseForDetails.batch_code || '',
+                    description: selectedCourseForDetails.description || '',
+                    start_date: selectedCourseForDetails.start_date ? new Date(selectedCourseForDetails.start_date) : null,
+                    end_date: selectedCourseForDetails.end_date ? new Date(selectedCourseForDetails.end_date) : null,
+                    seat_limit: selectedCourseForDetails.seat_limit || 0,
+                    total_classes_offered: selectedCourseForDetails.total_classes_offered || '',
+                    prerequisite_course_id: selectedCourseForDetails.prerequisite_course_id || null,
+                  });
+                }}
+                disabled={editCourseLoading}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveCourseEdit}
+                variant="contained"
+                disabled={editCourseLoading}
+                startIcon={editCourseLoading ? <CircularProgress size={20} /> : null}
+              >
+                Save Changes
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => {
+              setCourseDetailsCardOpen(false);
+              setSelectedCourseForDetails(null);
+              setIsEditingCourse(false);
+            }}>
+              Close
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
@@ -1622,7 +2126,7 @@ function Courses() {
       <Dialog
         open={importDialogOpen}
         onClose={handleCloseImport}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
@@ -1637,8 +2141,92 @@ function Courses() {
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} mt={1}>
             <Typography variant="body2" color="text.secondary">
-             
+              Upload an Excel (.xlsx, .xls) or CSV file with enrollment registration data. Required columns: employee_id, name, email, sbu. Optional: designation
             </Typography>
+            
+            {/* Preview Section */}
+            <Box>
+              <Box 
+                display="flex" 
+                alignItems="center" 
+                justifyContent="space-between"
+                sx={{ 
+                  cursor: 'pointer',
+                  p: 1,
+                  borderRadius: 1,
+                  '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.05) }
+                }}
+                onClick={() => setShowEnrollmentPreview(!showEnrollmentPreview)}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Visibility fontSize="small" />
+                  Preview Expected Format
+                </Typography>
+                <IconButton size="small">
+                  {showEnrollmentPreview ? <ExpandLess /> : <ExpandMore />}
+                </IconButton>
+              </Box>
+              
+              <Collapse in={showEnrollmentPreview}>
+                <Box mt={1} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, borderRadius: 2, overflow: 'hidden' }}>
+                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-end', borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<Download />}
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = '/ADA2025A_registration.xlsx';
+                        link.download = 'ADA2025A_registration.xlsx';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Download Template
+                    </Button>
+                  </Box>
+                  <TableContainer>
+                    <Table size="small" sx={{ minWidth: 650 }}>
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>employee_id</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>name</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>email</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>sbu</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>designation</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {enrollmentPreviewData.map((row, index) => (
+                          <TableRow 
+                            key={index}
+                            sx={{ 
+                              '&:nth-of-type(odd)': { backgroundColor: alpha(theme.palette.primary.main, 0.02) }
+                            }}
+                          >
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.employee_id}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.name}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.email}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>
+                              <Chip label={row.sbu} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.designation}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                      <strong>Note:</strong> Column names are case-insensitive. SBU values: IT, HR, Finance, Operations, Sales, Marketing, Other. 
+                      Designation is optional. The file will be imported for the selected course automatically.
+                    </Typography>
+                  </Box>
+                </Box>
+              </Collapse>
+            </Box>
             <Button
               variant="outlined"
               component="label"
@@ -1841,7 +2429,7 @@ function Courses() {
       <Dialog
         open={attendanceScoresDialogOpen}
         onClose={handleCloseAttendanceScores}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
@@ -1856,11 +2444,90 @@ function Courses() {
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} mt={1}>
             <Typography variant="body2" color="text.secondary">
-             
+              Upload an Excel (.xlsx, .xls) or CSV file with attendance and score data. Required columns: bsid (or employee_id), name, email, total_classes_attended, score
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            
+            {/* Preview Section */}
+            <Box>
+              <Box 
+                display="flex" 
+                alignItems="center" 
+                justifyContent="space-between"
+                sx={{ 
+                  cursor: 'pointer',
+                  p: 1,
+                  borderRadius: 1,
+                  '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.05) }
+                }}
+                onClick={() => setShowAttendancePreview(!showAttendancePreview)}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Visibility fontSize="small" />
+                  Preview Expected Format
+                </Typography>
+                <IconButton size="small">
+                  {showAttendancePreview ? <ExpandLess /> : <ExpandMore />}
+                </IconButton>
+              </Box>
               
-            </Typography>
+              <Collapse in={showAttendancePreview}>
+                <Box mt={1} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, borderRadius: 2, overflow: 'hidden' }}>
+                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-end', borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<Download />}
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = '/ADA2025A_completion.xlsx';
+                        link.download = 'ADA2025A_completion.xlsx';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Download Template
+                    </Button>
+                  </Box>
+                  <TableContainer>
+                    <Table size="small" sx={{ minWidth: 650 }}>
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>bsid</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>name</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>email</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>total_classes_attended</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>score</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {attendancePreviewData.map((row, index) => (
+                          <TableRow 
+                            key={index}
+                            sx={{ 
+                              '&:nth-of-type(odd)': { backgroundColor: alpha(theme.palette.primary.main, 0.02) }
+                            }}
+                          >
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.bsid}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.name}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.email}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.total_classes_attended}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.score}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                      <strong>Note:</strong> Column names are case-insensitive. bsid can also be employee_id. total_classes_attended should not exceed the course's "Total Classes Offered". 
+                      Score is typically a percentage (0-100). Completion status will be automatically calculated based on attendance percentage (≥80% = Completed).
+                    </Typography>
+                  </Box>
+                </Box>
+              </Collapse>
+            </Box>
             {(!selectedCourseForAttendance?.total_classes_offered || selectedCourseForAttendance.total_classes_offered <= 0) && (
               <Alert severity="warning" sx={{ mt: 1 }}>
                 This course does not have "Total Classes Offered" set. Please set it in the course settings before uploading attendance and scores.

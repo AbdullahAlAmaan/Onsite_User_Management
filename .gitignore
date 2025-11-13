@@ -62,4 +62,6 @@ frontend/.env.production.local
 
 # Alembic
 alembic/versions/*.pyc
+RESUME_SUMMARY.md
+TECH_STACK_AND_FEATURES.md
 

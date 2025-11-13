@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -24,18 +24,25 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  InputAdornment,
+  Autocomplete,
 } from '@mui/material';
-import { ExpandMore, ExpandLess, PersonAdd } from '@mui/icons-material';
+import { ExpandMore, ExpandLess, PersonAdd, UploadFile, Visibility, PersonRemove, Search, Download } from '@mui/icons-material';
 import { studentsAPI } from '../services/api';
 import UserDetailsDialog from '../components/UserDetailsDialog';
 
 function Users() {
   const theme = useTheme();
-  const [users, setUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedUser, setExpandedUser] = useState(null);
   const [selectedSBU, setSelectedSBU] = useState('');
   const [filterNeverTaken, setFilterNeverTaken] = useState('');
+  const [employeeCount, setEmployeeCount] = useState(0);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [selectedUserToRemove, setSelectedUserToRemove] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSearchUser, setSelectedSearchUser] = useState(null);
   const [userDetailsOpen, setUserDetailsOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -48,40 +55,98 @@ function Users() {
     experience_years: 0,
   });
   const [message, setMessage] = useState(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResults, setImportResults] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+  
+  // Sample preview data from employee_data_101_200.xlsx
+  const previewData = [
+    { employee_id: 'EMP101', name: 'Cameron Williams', email: 'cameron.williams101@company.com', sbu: 'IT', designation: 'Coordinator' },
+    { employee_id: 'EMP102', name: 'Morgan Williams', email: 'morgan.williams102@company.com', sbu: 'Marketing', designation: 'Engineer' },
+    { employee_id: 'EMP103', name: 'Morgan Moore', email: 'morgan.moore103@company.com', sbu: 'Finance', designation: 'Coordinator' },
+    { employee_id: 'EMP104', name: 'Casey Miller', email: 'casey.miller104@company.com', sbu: 'Operations', designation: 'Coordinator' },
+    { employee_id: 'EMP105', name: 'Alex Jones', email: 'alex.jones105@company.com', sbu: 'HR', designation: 'Manager' },
+  ];
 
   useEffect(() => {
     fetchUsers();
   }, [selectedSBU, filterNeverTaken]);
 
+  // Filter users based on search query and filters
+  const users = useMemo(() => {
+    let filtered = [...allUsers];
+    
+    // Filter by never taken course if selected
+    if (filterNeverTaken === 'yes') {
+      filtered = filtered.filter(user => user.never_taken_course === true);
+    } else if (filterNeverTaken === 'no') {
+      filtered = filtered.filter(user => user.never_taken_course === false);
+    }
+    
+    // Filter by search query if provided (only if not using autocomplete selection)
+    if (searchQuery.trim() && !selectedSearchUser) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(user => 
+        user.name?.toLowerCase().includes(query) ||
+        user.email?.toLowerCase().includes(query) ||
+        user.employee_id?.toLowerCase().includes(query)
+      );
+    } else if (selectedSearchUser) {
+      // If a user is selected from autocomplete, show only that user
+      filtered = filtered.filter(user => user.id === selectedSearchUser.id);
+    }
+    
+    return filtered;
+  }, [allUsers, filterNeverTaken, searchQuery, selectedSearchUser]);
+
+  // Update count when filtered users change
+  useEffect(() => {
+    setEmployeeCount(users.length);
+  }, [users]);
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { is_active: true };
       if (selectedSBU) params.sbu = selectedSBU;
       const response = await studentsAPI.getAllWithCourses(params);
-      let filteredUsers = response.data;
-      
-      // Filter by never taken course if selected
-      if (filterNeverTaken === 'yes') {
-        filteredUsers = filteredUsers.filter(user => user.never_taken_course === true);
-      } else if (filterNeverTaken === 'no') {
-        filteredUsers = filteredUsers.filter(user => user.never_taken_course === false);
-      }
+      let fetchedUsers = response.data;
       
       // Sort by employee_id (ascending) - EMP001, EMP002, EMP003, etc.
-      filteredUsers.sort((a, b) => {
+      fetchedUsers.sort((a, b) => {
         // Extract numeric part for proper sorting
         const numA = parseInt(a.employee_id.replace(/\D/g, '')) || 0;
         const numB = parseInt(b.employee_id.replace(/\D/g, '')) || 0;
         return numA - numB;
       });
       
-      setUsers(filteredUsers);
+      setAllUsers(fetchedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       setMessage({ type: 'error', text: 'Error fetching users' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRemoveEmployee = (user) => {
+    setSelectedUserToRemove(user);
+    setRemoveDialogOpen(true);
+  };
+
+  const confirmRemoveEmployee = async () => {
+    if (!selectedUserToRemove) return;
+    
+    try {
+      await studentsAPI.remove(selectedUserToRemove.id);
+      setMessage({ type: 'success', text: `Employee ${selectedUserToRemove.name} removed successfully` });
+      setRemoveDialogOpen(false);
+      setSelectedUserToRemove(null);
+      await fetchUsers();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error removing employee' });
     }
   };
 
@@ -117,46 +182,120 @@ function Users() {
         designation: '',
         experience_years: 0,
       });
-      fetchUsers();
+      await fetchUsers();
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Error creating student' });
     }
+  };
+
+  const handleImportFileChange = (event) => {
+    setImportFile(event.target.files[0]);
+    setImportResults(null);
+  };
+
+  const handleImportExcel = async () => {
+    if (!importFile) {
+      setMessage({ type: 'error', text: 'Please select a file' });
+      return;
+    }
+
+    setImportLoading(true);
+    setMessage(null);
+    try {
+      const response = await studentsAPI.importExcel(importFile);
+      setImportResults(response.data.results);
+      setMessage({ type: 'success', text: response.data.message });
+      setImportFile(null);
+      await fetchUsers();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleImportCSV = async () => {
+    if (!importFile) {
+      setMessage({ type: 'error', text: 'Please select a file' });
+      return;
+    }
+
+    setImportLoading(true);
+    setMessage(null);
+    try {
+      const response = await studentsAPI.importCSV(importFile);
+      setImportResults(response.data.results);
+      setMessage({ type: 'success', text: response.data.message });
+      setImportFile(null);
+      await fetchUsers();
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleCloseImport = () => {
+    setImportDialogOpen(false);
+    setImportFile(null);
+    setImportResults(null);
   };
 
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Box>
-          <Typography 
-            variant="h4" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 600,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
-            All Employees
-          </Typography>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Typography 
+              variant="h4" 
+              gutterBottom
+              sx={{ 
+                fontWeight: 600,
+                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              All Employees
+            </Typography>
+            <Chip 
+              label={`${employeeCount} employees`}
+              color="primary"
+              sx={{ fontWeight: 600 }}
+            />
+          </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             View all employees with their course history and attendance
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<PersonAdd />}
-          onClick={() => setCreateDialogOpen(true)}
-          sx={{
-            borderRadius: 2,
-            textTransform: 'none',
-            fontWeight: 500,
-            boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-          }}
-        >
-          Add Employee
-        </Button>
+        <Box display="flex" gap={2}>
+          <Button
+            variant="outlined"
+            startIcon={<UploadFile />}
+            onClick={() => setImportDialogOpen(true)}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500,
+            }}
+          >
+            Import Employees
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<PersonAdd />}
+            onClick={() => setCreateDialogOpen(true)}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500,
+              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+            }}
+          >
+            Add Employee
+          </Button>
+        </Box>
       </Box>
 
       {message && (
@@ -183,13 +322,77 @@ function Users() {
       >
         <CardContent>
           <Box display="flex" gap={2} flexWrap="wrap">
+            <Autocomplete
+              options={allUsers}
+              getOptionLabel={(option) => option ? `${option.name} (${option.employee_id}) - ${option.email}` : ''}
+              value={selectedSearchUser}
+              onChange={(event, newValue) => {
+                setSelectedSearchUser(newValue);
+                if (newValue) {
+                  setSearchQuery(newValue.name || '');
+                } else {
+                  setSearchQuery('');
+                }
+              }}
+              onInputChange={(event, newInputValue) => {
+                setSearchQuery(newInputValue);
+                if (!newInputValue) {
+                  setSelectedSearchUser(null);
+                }
+              }}
+              inputValue={searchQuery}
+              filterOptions={(options, { inputValue }) => {
+                if (!inputValue) return [];
+                const searchLower = inputValue.toLowerCase();
+                return options.filter((user) =>
+                  user.name?.toLowerCase().includes(searchLower) ||
+                  user.email?.toLowerCase().includes(searchLower) ||
+                  user.employee_id?.toLowerCase().includes(searchLower)
+                );
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Search Employees"
+                  placeholder="Search by name, email, or employee ID..."
+                  size="small"
+                  sx={{ minWidth: 300, flexGrow: 1 }}
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <>
+                        <InputAdornment position="start">
+                          <Search sx={{ color: 'text.secondary' }} />
+                        </InputAdornment>
+                        {params.InputProps.startAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+              renderOption={(props, user) => (
+                <Box component="li" {...props} key={user.id}>
+                  <Box>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {user.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {user.employee_id} • {user.email}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+              noOptionsText="No employees found"
+              clearOnEscape
+              clearOnBlur={false}
+            />
             <TextField
               select
-              label="Filter by SBU"
+              label="SBU"
               value={selectedSBU}
               onChange={(e) => setSelectedSBU(e.target.value)}
               sx={{ minWidth: 200 }}
-              variant="outlined"
+              size="small"
             >
               <MenuItem value="">All SBUs</MenuItem>
               <MenuItem value="IT">IT</MenuItem>
@@ -198,6 +401,7 @@ function Users() {
               <MenuItem value="Operations">Operations</MenuItem>
               <MenuItem value="Sales">Sales</MenuItem>
               <MenuItem value="Marketing">Marketing</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
             </TextField>
             <TextField
               select
@@ -205,9 +409,9 @@ function Users() {
               value={filterNeverTaken}
               onChange={(e) => setFilterNeverTaken(e.target.value)}
               sx={{ minWidth: 200 }}
-              variant="outlined"
+              size="small"
             >
-              <MenuItem value="">All Users</MenuItem>
+              <MenuItem value="">All Employees</MenuItem>
               <MenuItem value="yes">Never Taken a Course</MenuItem>
               <MenuItem value="no">Has Taken Courses</MenuItem>
             </TextField>
@@ -238,6 +442,7 @@ function Users() {
                   <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Course History</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Remove</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -313,9 +518,19 @@ function Users() {
                           )}
                         </Box>
                       </TableCell>
+                      <TableCell>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleRemoveEmployee(user)}
+                          title="Remove Employee"
+                        >
+                          <PersonRemove />
+                        </IconButton>
+                      </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
                         <Collapse in={expandedUser === user.id} timeout="auto" unmountOnExit>
                           <Box sx={{ margin: 2 }}>
                             <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
@@ -448,6 +663,17 @@ function Users() {
                                               </Typography>
                                             </Box>
                                           )}
+                                          
+                                          {enrollment.course_end_date && (
+                                            <Box>
+                                              <Typography variant="caption" color="text.secondary" display="block">
+                                                End Date
+                                              </Typography>
+                                              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                                {new Date(enrollment.course_end_date).toLocaleDateString()}
+                                              </Typography>
+                                            </Box>
+                                          )}
                                         </Box>
                                       </CardContent>
                                     </Card>
@@ -543,6 +769,213 @@ function Users() {
           <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleCreateStudent} variant="contained">
             Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Import Employees Dialog */}
+      <Dialog
+        open={importDialogOpen}
+        onClose={handleCloseImport}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Import Employees from File</DialogTitle>
+        <DialogContent>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            <Typography variant="body2" color="text.secondary">
+        
+            </Typography>
+            
+            {/* Preview Section */}
+            <Box>
+              <Box 
+                display="flex" 
+                alignItems="center" 
+                justifyContent="space-between"
+                sx={{ 
+                  cursor: 'pointer',
+                  p: 1,
+                  borderRadius: 1,
+                  '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.05) }
+                }}
+                onClick={() => setShowPreview(!showPreview)}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Visibility fontSize="small" />
+                  Preview Expected Format
+                </Typography>
+                <IconButton size="small">
+                  {showPreview ? <ExpandLess /> : <ExpandMore />}
+                </IconButton>
+              </Box>
+              
+              <Collapse in={showPreview}>
+                <Box mt={1} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, borderRadius: 2, overflow: 'hidden' }}>
+                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-end', borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<Download />}
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = '/employee_data_101_200.xlsx';
+                        link.download = 'employee_data_101_200.xlsx';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Download Template
+                    </Button>
+                  </Box>
+                  <TableContainer>
+                    <Table size="small" sx={{ minWidth: 650 }}>
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>employee_id</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>name</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>email</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>sbu</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>designation</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {previewData.map((row, index) => (
+                          <TableRow 
+                            key={index}
+                            sx={{ 
+                              '&:nth-of-type(odd)': { backgroundColor: alpha(theme.palette.primary.main, 0.02) }
+                            }}
+                          >
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.employee_id}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.name}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.email}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>
+                              <Chip label={row.sbu} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.designation}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                      <strong>Note:</strong> Column names are case-insensitive. SBU values: IT, HR, Finance, Operations, Sales, Marketing, Other. 
+                      Designation is an optional field.
+                    </Typography>
+                  </Box>
+                </Box>
+              </Collapse>
+            </Box>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleImportFileChange}
+              style={{ display: 'none' }}
+              id="import-file-input"
+            />
+            <label htmlFor="import-file-input">
+              <Button
+                variant="outlined"
+                component="span"
+                fullWidth
+                startIcon={<UploadFile />}
+                sx={{ mb: 2 }}
+              >
+                {importFile ? importFile.name : 'Select File'}
+              </Button>
+            </label>
+            {importResults && (
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                  Import Results:
+                </Typography>
+                <Typography variant="body2">
+                  Total: {importResults.total} | Created: {importResults.created} | Updated: {importResults.updated}
+                </Typography>
+                {importResults.errors && importResults.errors.length > 0 && (
+                  <Box mt={1}>
+                    <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
+                      Errors ({importResults.errors.length}):
+                    </Typography>
+                    {importResults.errors.slice(0, 5).map((error, index) => (
+                      <Typography key={index} variant="caption" display="block" color="error">
+                        {error.error}
+                      </Typography>
+                    ))}
+                    {importResults.errors.length > 5 && (
+                      <Typography variant="caption" color="error">
+                        ... and {importResults.errors.length - 5} more errors
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseImport}>Close</Button>
+          <Button
+            onClick={handleImportExcel}
+            variant="contained"
+            disabled={!importFile || importLoading}
+            startIcon={importLoading ? <CircularProgress size={20} /> : null}
+          >
+            Upload Excel
+          </Button>
+          <Button
+            onClick={handleImportCSV}
+            variant="contained"
+            disabled={!importFile || importLoading}
+            startIcon={importLoading ? <CircularProgress size={20} /> : null}
+          >
+            Upload CSV
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Remove Employee Confirmation Dialog */}
+      <Dialog
+        open={removeDialogOpen}
+        onClose={() => {
+          setRemoveDialogOpen(false);
+          setSelectedUserToRemove(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Remove Employee</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mt: 1 }}>
+            Are you sure you want to remove <strong>{selectedUserToRemove?.name}</strong> ({selectedUserToRemove?.employee_id})?
+          </Typography>
+          <Alert severity="info" sx={{ mt: 2 }}>
+            The employee will be moved to "Previous Employees" tab. All course history and enrollments will be preserved.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setRemoveDialogOpen(false);
+            setSelectedUserToRemove(null);
+          }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmRemoveEmployee}
+            variant="contained"
+            color="error"
+          >
+            Remove
           </Button>
         </DialogActions>
       </Dialog>

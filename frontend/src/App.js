@@ -4,8 +4,10 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
 import Courses from './pages/Courses';
 import Users from './pages/Users';
+import PreviousEmployees from './pages/PreviousEmployees';
 import PrivateRoute from './components/PrivateRoute';
 
 const theme = createTheme({
@@ -26,9 +28,11 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<PrivateRoute><Layout><Navigate to="/courses" replace /></Layout></PrivateRoute>} />
+          <Route path="/" element={<PrivateRoute><Layout><Navigate to="/dashboard" replace /></Layout></PrivateRoute>} />
+          <Route path="/dashboard" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
           <Route path="/courses" element={<PrivateRoute><Layout><Courses /></Layout></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><Layout><Users /></Layout></PrivateRoute>} />
+          <Route path="/previous-employees" element={<PrivateRoute><Layout><PreviousEmployees /></Layout></PrivateRoute>} />
         </Routes>
       </Router>
     </ThemeProvider>

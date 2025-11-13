@@ -80,6 +80,23 @@ export const studentsAPI = {
   create: (data) => api.post('/students', data),
   getEnrollments: (id) => api.get(`/students/${id}/enrollments`),
   getAllWithCourses: (params) => api.get('/students/all/with-courses', { params }),
+  getCount: (params) => api.get('/students/count', { params }),
+  remove: (id) => api.post(`/students/${id}/remove`),
+  restore: (id) => api.post(`/students/${id}/restore`),
+  importExcel: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/students/import/excel', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  importCSV: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/students/import/csv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 export const importsAPI = {
