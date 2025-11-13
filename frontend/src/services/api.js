@@ -72,6 +72,7 @@ export const coursesAPI = {
   update: (id, data) => api.put(`/courses/${id}`, data),
   archive: (id) => api.post(`/courses/${id}/archive`),
   delete: (id) => api.delete(`/courses/${id}`),
+  generateReport: (id) => api.get(`/courses/${id}/report`, { responseType: 'blob' }),
 };
 
 export const studentsAPI = {

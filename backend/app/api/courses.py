@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date, datetime, timedelta
+import pandas as pd
+import io
 from app.db.base import get_db
 from app.models.course import Course
+from app.models.enrollment import Enrollment
 from app.schemas.course import CourseCreate, CourseResponse, CourseUpdate
 
 router = APIRouter()
@@ -159,4 +163,125 @@ def archive_course(course_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(course)
     return CourseResponse.from_orm(course)
+
+@router.get("/{course_id}/report")
+def generate_course_report(course_id: int, db: Session = Depends(get_db)):
+    """Generate an Excel report for a course with enrolled students data (Approved and Withdrawn only, excluding Rejected)."""
+    from app.models.student import Student
+    from app.models.enrollment import CompletionStatus, ApprovalStatus
+    
+    # Get course
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Get only approved and withdrawn enrollments (exclude rejected and pending)
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.approval_status.in_([ApprovalStatus.APPROVED, ApprovalStatus.WITHDRAWN])
+    ).all()
+    
+    # Prepare data for Excel
+    report_data = []
+    for enrollment in enrollments:
+        student = db.query(Student).filter(Student.id == enrollment.student_id).first()
+        if not student:
+            continue
+        
+        # Calculate attendance percentage
+        attendance_percentage = None
+        attendance_display = '-'
+        if enrollment.total_attendance and enrollment.total_attendance > 0:
+            if enrollment.present is not None:
+                attendance_percentage = (enrollment.present / enrollment.total_attendance * 100)
+                attendance_display = f"{attendance_percentage:.1f}%"
+        elif enrollment.attendance_percentage is not None:
+            # Use stored attendance_percentage if available
+            attendance_percentage = enrollment.attendance_percentage
+            attendance_display = f"{attendance_percentage:.1f}%"
+        elif enrollment.attendance_status:
+            attendance_display = enrollment.attendance_status
+        
+        # Calculate overall completion rate for this student
+        all_student_enrollments = db.query(Enrollment).filter(
+            Enrollment.student_id == enrollment.student_id,
+            Enrollment.approval_status.in_([ApprovalStatus.APPROVED, ApprovalStatus.WITHDRAWN])
+        ).all()
+        
+        # Count relevant enrollments (completed, failed, or withdrawn)
+        relevant_enrollments = [
+            e for e in all_student_enrollments
+            if (
+                (e.approval_status == ApprovalStatus.WITHDRAWN) or
+                (e.approval_status == ApprovalStatus.APPROVED and 
+                 e.completion_status in [CompletionStatus.COMPLETED, CompletionStatus.FAILED])
+            )
+        ]
+        
+        total_courses = len(relevant_enrollments)
+        completed_courses = sum(1 for e in relevant_enrollments if e.completion_status == CompletionStatus.COMPLETED)
+        overall_completion_rate = (completed_courses / total_courses * 100) if total_courses > 0 else 0.0
+        
+        report_data.append({
+            'Employee ID': student.employee_id,
+            'Name': student.name,
+            'Email': student.email,
+            'SBU': student.sbu.value if student.sbu else '',
+            'Designation': student.designation or '',
+            'Approval Status': enrollment.approval_status.value if enrollment.approval_status else '',
+            'Completion Status': enrollment.completion_status.value if enrollment.completion_status else '',
+            'Total Classes': enrollment.total_attendance or 0,
+            'Classes Attended': enrollment.present or 0,
+            'Attendance': attendance_display,
+            'Score': enrollment.score if enrollment.score is not None else '-',
+            'Total Courses Assigned': total_courses,
+            'Completed Courses': completed_courses,
+            'Overall Completion Rate': f"{overall_completion_rate:.1f}%",
+            'Enrollment Date': enrollment.created_at.strftime('%Y-%m-%d %H:%M:%S') if enrollment.created_at else '',
+            'Approval Date': enrollment.approved_at.strftime('%Y-%m-%d %H:%M:%S') if enrollment.approved_at and enrollment.approval_status == ApprovalStatus.APPROVED else '',
+            'Withdrawal Date': enrollment.updated_at.strftime('%Y-%m-%d %H:%M:%S') if enrollment.approval_status == ApprovalStatus.WITHDRAWN and enrollment.updated_at else '',
+            'Withdrawal Reason': enrollment.rejection_reason if enrollment.approval_status == ApprovalStatus.WITHDRAWN else '',
+        })
+    
+    # Create DataFrame
+    df = pd.DataFrame(report_data)
+    
+    # If no enrollments, create empty DataFrame with columns
+    if df.empty:
+        df = pd.DataFrame(columns=[
+            'Employee ID', 'Name', 'Email', 'SBU', 'Designation',
+            'Approval Status', 'Completion Status', 'Total Classes', 'Classes Attended',
+            'Attendance', 'Score', 'Total Courses Assigned', 'Completed Courses',
+            'Overall Completion Rate', 'Enrollment Date', 'Approval Date',
+            'Withdrawal Date', 'Withdrawal Reason'
+        ])
+    
+    # Create Excel file in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Enrollments', index=False)
+        
+        # Auto-adjust column widths
+        worksheet = writer.sheets['Enrollments']
+        from openpyxl.utils import get_column_letter
+        for idx, col in enumerate(df.columns):
+            max_length = max(
+                df[col].astype(str).map(len).max() if not df.empty else 0,
+                len(str(col))
+            )
+            column_letter = get_column_letter(idx + 1)
+            worksheet.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    
+    output.seek(0)
+    
+    # Generate filename
+    safe_course_name = "".join(c for c in course.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_batch_code = "".join(c for c in course.batch_code if c.isalnum() or c in (' ', '-', '_')).strip()
+    filename = f"{safe_course_name}_{safe_batch_code}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return StreamingResponse(
+        io.BytesIO(output.read()),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 

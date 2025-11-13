@@ -25,7 +25,7 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete, CheckCircle, Cancel, Visibility, Download } from '@mui/icons-material';
+import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete, CheckCircle, Cancel, Visibility, Download, Description } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -230,6 +230,41 @@ function Courses() {
       } catch (error) {
         setMessage({ type: 'error', text: error.response?.data?.detail || 'Error deleting course' });
       }
+    }
+  };
+
+  const handleGenerateReport = async (courseId) => {
+    try {
+      const response = await coursesAPI.generateReport(courseId);
+      
+      // Create blob from response
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `course_report_${courseId}.xlsx`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      setMessage({ type: 'success', text: 'Report generated and downloaded successfully' });
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error generating report' });
     }
   };
 
@@ -995,6 +1030,13 @@ function Courses() {
                           title="View Course Details"
                         >
                           <Info />
+                        </IconButton>
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleGenerateReport(course.id)}
+                          title="Generate Report"
+                        >
+                          <Description />
                         </IconButton>
                         {!showArchived && (
                           <>
