@@ -356,7 +356,7 @@ function Users() {
               fontWeight: 500,
             }}
           >
-            Import Employees
+            Upload Total Employees
           </Button>
           <Button
             variant="contained"
@@ -614,7 +614,25 @@ function Users() {
                             </Typography>
                             {user.enrollments && user.enrollments.length > 0 ? (
                               <Box display="flex" flexDirection="column" gap={2}>
-                                {user.enrollments.map((enrollment, index) => {
+                                {user.enrollments
+                                  .slice()
+                                  .sort((a, b) => {
+                                    // Define priority order: Completed (1), Failed (2), In Progress (3), Others (4)
+                                    const getStatusPriority = (status) => {
+                                      if (status === 'Completed') return 1;
+                                      if (status === 'Failed') return 2;
+                                      if (status === 'In Progress') return 3;
+                                      return 4;
+                                    };
+                                    const priorityA = getStatusPriority(a.completion_status);
+                                    const priorityB = getStatusPriority(b.completion_status);
+                                    if (priorityA !== priorityB) {
+                                      return priorityA - priorityB;
+                                    }
+                                    // If same priority, sort by course name alphabetically
+                                    return (a.course_name || '').localeCompare(b.course_name || '');
+                                  })
+                                  .map((enrollment, index) => {
                                   const isCompleted = enrollment.completion_status === 'Completed';
                                   const isFailed = enrollment.completion_status === 'Failed';
                                   const isInProgress = enrollment.completion_status === 'In Progress';
