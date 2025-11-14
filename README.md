@@ -45,6 +45,16 @@ Onsite_User_Management/
 └── README.md
 ```
 
+## Docker Setup (Recommended)
+
+**The easiest way to run the entire application is using Docker:**
+
+1. Create `.env` file from `.env.example`
+2. Run: `docker compose up --build`
+3. Access frontend at http://localhost:3000 and backend at http://localhost:8000
+
+See [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed Docker instructions.
+
 ## MVP Setup Instructions (Local Development)
 
 ### Prerequisites
