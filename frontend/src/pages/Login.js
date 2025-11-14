@@ -31,8 +31,8 @@ function Login() {
       // Store token
       localStorage.setItem('token', access_token);
       
-      // Redirect to courses
-      navigate('/courses');
+      // Redirect to dashboard
+      navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
       if (err.code === 'ECONNABORTED' || err.message === 'Network Error') {
