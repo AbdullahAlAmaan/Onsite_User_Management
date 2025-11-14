@@ -49,8 +49,6 @@ jobs:
           push: true
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/enroll23-backend:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/enroll23-backend:buildcache,mode=max
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
@@ -61,8 +59,6 @@ jobs:
           labels: ${{ steps.meta-frontend.outputs.labels }}
           build-args: |
             REACT_APP_API_URL=http://localhost:8000/api/v1
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/enroll23-frontend:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/enroll23-frontend:buildcache,mode=max
 
       - name: Image digest
         run: |
