@@ -23,6 +23,7 @@ services:
       retries: 5
 
   backend:
+    platform: linux/amd64
     image: aaamaan/enroll23-backend:latest
     container_name: enroll23-backend
     restart: always
@@ -44,6 +45,7 @@ services:
       retries: 3
 
   frontend:
+    platform: linux/amd64
     image: aaamaan/enroll23-frontend:latest
     container_name: enroll23-frontend
     restart: always
