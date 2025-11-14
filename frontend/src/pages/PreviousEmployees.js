@@ -425,7 +425,7 @@ function PreviousEmployees() {
                                           )}
                                           {enrollment.course_end_date && (
                                             <Typography variant="body2" color="text.secondary">
-                                              End Date: {enrollment.course_end_date}
+                                              Completion Date: {enrollment.course_end_date}
                                             </Typography>
                                           )}
                                         </Box>

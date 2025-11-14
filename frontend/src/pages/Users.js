@@ -667,7 +667,7 @@ function Users() {
                                           {enrollment.course_end_date && (
                                             <Box>
                                               <Typography variant="caption" color="text.secondary" display="block">
-                                                End Date
+                                                Completion Date
                                               </Typography>
                                               <Typography variant="body2" sx={{ mt: 0.5 }}>
                                                 {new Date(enrollment.course_end_date).toLocaleDateString()}

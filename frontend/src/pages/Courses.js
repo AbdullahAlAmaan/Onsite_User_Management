@@ -1057,7 +1057,7 @@ function Courses() {
                             <IconButton
                               color="primary"
                               onClick={() => handleOpenImport(course)}
-                              title="Import Enrollment Data"
+                              title="Upload Registered Students"
                             >
                               <UploadFile />
                             </IconButton>
@@ -1153,6 +1153,19 @@ function Courses() {
                                             if (enrollment.approval_status !== 'Approved') return false;
                                             if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
                                             return true;
+                                          })
+                                          .sort((a, b) => {
+                                            // Extract numeric part from employee ID for proper sorting
+                                            const empIdA = a.student_employee_id || '';
+                                            const empIdB = b.student_employee_id || '';
+                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
+                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
+                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
+                                            if (numA !== numB) {
+                                              return numA - numB;
+                                            }
+                                            // If numbers are equal or not found, sort alphabetically
+                                            return empIdA.localeCompare(empIdB);
                                           })
                                           .map((enrollment) => (
                                             <TableRow key={enrollment.id} hover>
@@ -1261,6 +1274,153 @@ function Courses() {
                                 </Box>
                               )}
 
+                              {/* Eligible Enrollments (Pending) Section */}
+                              {courseEnrollments[course.id].filter(e => {
+                                if (e.eligibility_status !== 'Eligible' || e.approval_status !== 'Pending') return false;
+                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                return true;
+                              }).length > 0 && (
+                                <Box>
+                                  <Typography 
+                                    variant="h6" 
+                                    gutterBottom
+                                    sx={{ 
+                                      mb: 2,
+                                      color: theme.palette.success.main,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Eligible Enrollments (Pending) ({courseEnrollments[course.id].filter(e => {
+                                      if (e.eligibility_status !== 'Eligible' || e.approval_status !== 'Pending') return false;
+                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                      return true;
+                                    }).length})
+                                  </Typography>
+                                  <TableContainer 
+                                    component={Paper} 
+                                    variant="outlined"
+                                    sx={{
+                                      borderRadius: 2,
+                                      border: `2px solid ${alpha(theme.palette.success.main, 0.3)}`,
+                                      backgroundColor: alpha(theme.palette.success.main, 0.02),
+                                    }}
+                                  >
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.success.main, 0.1) }}>
+                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {courseEnrollments[course.id]
+                                          .filter(enrollment => {
+                                            if (enrollment.eligibility_status !== 'Eligible' || enrollment.approval_status !== 'Pending') return false;
+                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
+                                            return true;
+                                          })
+                                          .sort((a, b) => {
+                                            // Extract numeric part from employee ID for proper sorting
+                                            const empIdA = a.student_employee_id || '';
+                                            const empIdB = b.student_employee_id || '';
+                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
+                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
+                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
+                                            if (numA !== numB) {
+                                              return numA - numB;
+                                            }
+                                            // If numbers are equal or not found, sort alphabetically
+                                            return empIdA.localeCompare(empIdB);
+                                          })
+                                          .map((enrollment) => (
+                                            <TableRow key={enrollment.id} hover>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_employee_id || '-'}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_name}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>{enrollment.student_email}</TableCell>
+                                              <TableCell>
+                                                <Chip label={enrollment.student_sbu} size="small" />
+                                              </TableCell>
+                                              <TableCell>
+                                                {(() => {
+                                                  const rate = enrollment.overall_completion_rate || 0;
+                                                  let color = 'error.main';
+                                                  if (rate >= 75) {
+                                                    color = 'success.main';
+                                                  } else if (rate >= 60) {
+                                                    color = 'warning.main';
+                                                  }
+                                                  return (
+                                                    <Typography
+                                                      sx={{
+                                                        color: color,
+                                                        fontWeight: 600,
+                                                      }}
+                                                    >
+                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
+                                                    </Typography>
+                                                  );
+                                                })()}
+                                              </TableCell>
+                                              <TableCell>
+                                                <Box display="flex" gap={1}>
+                                                  <IconButton
+                                                    size="small"
+                                                    color="success"
+                                                    onClick={() => handleApprove(enrollment.id)}
+                                                    title="Approve"
+                                                  >
+                                                    <CheckCircle fontSize="small" />
+                                                  </IconButton>
+                                                  <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => handleReject(enrollment.id)}
+                                                    title="Reject"
+                                                  >
+                                                    <Cancel fontSize="small" />
+                                                  </IconButton>
+                                                </Box>
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              )}
+
                               {/* Withdrawn Students Section */}
                               {courseEnrollments[course.id].filter(e => {
                                 if (e.approval_status !== 'Withdrawn') return false;
@@ -1301,12 +1461,7 @@ function Courses() {
                                           <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Withdrawal Reason</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>
-                                            <Box display="flex" alignItems="center" gap={0.5}>
-                                              <Add fontSize="small" />
-                                              Add
-                                            </Box>
-                                          </TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Add</TableCell>
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
@@ -1315,6 +1470,19 @@ function Courses() {
                                             if (enrollment.approval_status !== 'Withdrawn') return false;
                                             if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
                                             return true;
+                                          })
+                                          .sort((a, b) => {
+                                            // Extract numeric part from employee ID for proper sorting
+                                            const empIdA = a.student_employee_id || '';
+                                            const empIdB = b.student_employee_id || '';
+                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
+                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
+                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
+                                            if (numA !== numB) {
+                                              return numA - numB;
+                                            }
+                                            // If numbers are equal or not found, sort alphabetically
+                                            return empIdA.localeCompare(empIdB);
                                           })
                                           .map((enrollment) => (
                                             <TableRow key={enrollment.id} hover>
@@ -1402,9 +1570,158 @@ function Courses() {
                                 </Box>
                               )}
 
+                              {/* Rejected Enrollments Section */}
+                              {courseEnrollments[course.id].filter(e => {
+                                if (e.approval_status !== 'Rejected') return false;
+                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                return true;
+                              }).length > 0 && (
+                                <Box>
+                                  <Typography 
+                                    variant="h6" 
+                                    gutterBottom
+                                    sx={{ 
+                                      mb: 2,
+                                      color: theme.palette.error.main,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Rejected Enrollments ({courseEnrollments[course.id].filter(e => {
+                                      if (e.approval_status !== 'Rejected') return false;
+                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
+                                      return true;
+                                    }).length})
+                                  </Typography>
+                                  <TableContainer 
+                                    component={Paper} 
+                                    variant="outlined"
+                                    sx={{
+                                      borderRadius: 2,
+                                      border: `2px solid ${alpha(theme.palette.error.main, 0.3)}`,
+                                      backgroundColor: alpha(theme.palette.error.main, 0.02),
+                                    }}
+                                  >
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.error.main, 0.1) }}>
+                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Rejection Reason</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Add</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {courseEnrollments[course.id]
+                                          .filter(enrollment => {
+                                            if (enrollment.approval_status !== 'Rejected') return false;
+                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
+                                            return true;
+                                          })
+                                          .sort((a, b) => {
+                                            // Extract numeric part from employee ID for proper sorting
+                                            const empIdA = a.student_employee_id || '';
+                                            const empIdB = b.student_employee_id || '';
+                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
+                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
+                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
+                                            if (numA !== numB) {
+                                              return numA - numB;
+                                            }
+                                            // If numbers are equal or not found, sort alphabetically
+                                            return empIdA.localeCompare(empIdB);
+                                          })
+                                          .map((enrollment) => (
+                                            <TableRow key={enrollment.id} hover>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_employee_id || '-'}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>
+                                                <Typography
+                                                  sx={{
+                                                    cursor: 'pointer',
+                                                    color: 'primary.main',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': {
+                                                      color: 'primary.dark',
+                                                    },
+                                                  }}
+                                                  onClick={() => handleViewUserDetails(enrollment)}
+                                                >
+                                                  {enrollment.student_name}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>{enrollment.student_email}</TableCell>
+                                              <TableCell>
+                                                <Chip label={enrollment.student_sbu} size="small" />
+                                              </TableCell>
+                                              <TableCell>
+                                                {enrollment.rejection_reason ? (
+                                                  <Typography variant="body2" color="error">
+                                                    {enrollment.rejection_reason}
+                                                  </Typography>
+                                                ) : (
+                                                  <Typography variant="body2" color="text.secondary">
+                                                    No reason provided
+                                                  </Typography>
+                                                )}
+                                              </TableCell>
+                                              <TableCell>
+                                                {(() => {
+                                                  const rate = enrollment.overall_completion_rate || 0;
+                                                  let color = 'error.main';
+                                                  if (rate >= 75) {
+                                                    color = 'success.main';
+                                                  } else if (rate >= 60) {
+                                                    color = 'warning.main';
+                                                  }
+                                                  return (
+                                                    <Typography
+                                                      sx={{
+                                                        color: color,
+                                                        fontWeight: 600,
+                                                      }}
+                                                    >
+                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
+                                                    </Typography>
+                                                  );
+                                                })()}
+                                              </TableCell>
+                                              <TableCell>
+                                                <IconButton
+                                                  size="small"
+                                                  color="success"
+                                                  onClick={() => handleApprove(enrollment.id)}
+                                                  title="Approve (Admin Override)"
+                                                >
+                                                  <PersonAdd fontSize="small" />
+                                                </IconButton>
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              )}
+
                               {/* Not Eligible Enrollments Section */}
                               {courseEnrollments[course.id].filter(e => {
-                                if (e.eligibility_status === 'Eligible' || e.approval_status === 'Approved' || e.approval_status === 'Withdrawn') return false;
+                                if (e.eligibility_status === 'Eligible' || e.approval_status === 'Approved' || e.approval_status === 'Withdrawn' || e.approval_status === 'Rejected') return false;
                                 if (selectedSBU && e.student_sbu !== selectedSBU) return false;
                                 return true;
                               }).length > 0 && (
@@ -1419,7 +1736,7 @@ function Courses() {
                                     }}
                                   >
                                     Not Eligible Enrollments ({courseEnrollments[course.id].filter(e => {
-                                      if (e.eligibility_status === 'Eligible' || e.approval_status === 'Approved' || e.approval_status === 'Withdrawn') return false;
+                                      if (e.eligibility_status === 'Eligible' || e.approval_status === 'Approved' || e.approval_status === 'Withdrawn' || e.approval_status === 'Rejected') return false;
                                       if (selectedSBU && e.student_sbu !== selectedSBU) return false;
                                       return true;
                                     }).length})
@@ -1443,20 +1760,28 @@ function Courses() {
                                           <TableCell sx={{ fontWeight: 600 }}>Eligibility Reason</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Approval Status</TableCell>
                                           <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>
-                                            <Box display="flex" alignItems="center" gap={0.5}>
-                                              <Add fontSize="small" />
-                                              Add
-                                            </Box>
-                                          </TableCell>
+                                          <TableCell sx={{ fontWeight: 600 }}>Add</TableCell>
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
                                         {courseEnrollments[course.id]
                                           .filter(enrollment => {
-                                            if (enrollment.eligibility_status === 'Eligible' || enrollment.approval_status === 'Approved' || enrollment.approval_status === 'Withdrawn') return false;
+                                            if (enrollment.eligibility_status === 'Eligible' || enrollment.approval_status === 'Approved' || enrollment.approval_status === 'Withdrawn' || enrollment.approval_status === 'Rejected') return false;
                                             if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
                                             return true;
+                                          })
+                                          .sort((a, b) => {
+                                            // Extract numeric part from employee ID for proper sorting
+                                            const empIdA = a.student_employee_id || '';
+                                            const empIdB = b.student_employee_id || '';
+                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
+                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
+                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
+                                            if (numA !== numB) {
+                                              return numA - numB;
+                                            }
+                                            // If numbers are equal or not found, sort alphabetically
+                                            return empIdA.localeCompare(empIdB);
                                           })
                                           .map((enrollment) => (
                                             <TableRow key={enrollment.id} hover>
@@ -1521,24 +1846,10 @@ function Courses() {
                                                 <Chip
                                                   label={enrollment.approval_status}
                                                   color={
-                                                    enrollment.approval_status === 'Pending' ? 'warning' :
-                                                    enrollment.approval_status === 'Rejected' ? 'error' : 'default'
+                                                    enrollment.approval_status === 'Pending' ? 'warning' : 'default'
                                                   }
                                                   size="small"
                                                 />
-                                                {enrollment.rejection_reason && enrollment.approval_status === 'Rejected' && (
-                                                  <Typography
-                                                    variant="caption"
-                                                    sx={{
-                                                      display: 'block',
-                                                      color: 'error.main',
-                                                      mt: 0.5,
-                                                      fontStyle: 'italic',
-                                                    }}
-                                                  >
-                                                    {enrollment.rejection_reason}
-                                                  </Typography>
-                                                )}
                                               </TableCell>
                                               <TableCell>
                                                 {(() => {
@@ -1562,172 +1873,16 @@ function Courses() {
                                                 })()}
                                               </TableCell>
                                               <TableCell>
-                                                <Box display="flex" gap={1}>
-                                                  {enrollment.approval_status === 'Pending' && (
-                                                    <>
-                                                      <IconButton
-                                                        size="small"
-                                                        color="success"
-                                                        onClick={() => handleApprove(enrollment.id)}
-                                                        title="Approve (Admin Override)"
-                                                      >
-                                                        <CheckCircle fontSize="small" />
-                                                      </IconButton>
-                                                      <IconButton
-                                                        size="small"
-                                                        color="error"
-                                                        onClick={() => handleReject(enrollment.id)}
-                                                        title="Reject"
-                                                      >
-                                                        <Cancel fontSize="small" />
-                                                      </IconButton>
-                                                    </>
-                                                  )}
-                                                  {enrollment.approval_status === 'Rejected' && (
-                                                    <IconButton
-                                                      size="small"
-                                                      color="success"
-                                                      onClick={() => handleApprove(enrollment.id)}
-                                                      title="Approve (Admin Override)"
-                                                    >
-                                                      <CheckCircle fontSize="small" />
-                                                    </IconButton>
-                                                  )}
-                                                </Box>
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                      </TableBody>
-                                    </Table>
-                                  </TableContainer>
-                                </Box>
-                              )}
-
-                              {/* Eligible Enrollments (Pending) Section */}
-                              {courseEnrollments[course.id].filter(e => {
-                                if (e.eligibility_status !== 'Eligible' || e.approval_status !== 'Pending') return false;
-                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                return true;
-                              }).length > 0 && (
-                                <Box>
-                                  <Typography 
-                                    variant="h6" 
-                                    gutterBottom
-                                    sx={{ 
-                                      mb: 2,
-                                      color: theme.palette.success.main,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Eligible Enrollments (Pending) ({courseEnrollments[course.id].filter(e => {
-                                      if (e.eligibility_status !== 'Eligible' || e.approval_status !== 'Pending') return false;
-                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                      return true;
-                                    }).length})
-                                  </Typography>
-                                  <TableContainer 
-                                    component={Paper} 
-                                    variant="outlined"
-                                    sx={{
-                                      borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.success.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.success.main, 0.02),
-                                    }}
-                                  >
-                                    <Table size="small">
-                                      <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.success.main, 0.1) }}>
-                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                                        </TableRow>
-                                      </TableHead>
-                                      <TableBody>
-                                        {courseEnrollments[course.id]
-                                          .filter(enrollment => {
-                                            if (enrollment.eligibility_status !== 'Eligible' || enrollment.approval_status !== 'Pending') return false;
-                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
-                                            return true;
-                                          })
-                                          .map((enrollment) => (
-                                            <TableRow key={enrollment.id} hover>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_employee_id || '-'}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_name}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>{enrollment.student_email}</TableCell>
-                                              <TableCell>
-                                                <Chip label={enrollment.student_sbu} size="small" />
-                                              </TableCell>
-                                              <TableCell>
-                                                {(() => {
-                                                  const rate = enrollment.overall_completion_rate || 0;
-                                                  let color = 'error.main';
-                                                  if (rate >= 75) {
-                                                    color = 'success.main';
-                                                  } else if (rate >= 60) {
-                                                    color = 'warning.main';
-                                                  }
-                                                  return (
-                                                    <Typography
-                                                      sx={{
-                                                        color: color,
-                                                        fontWeight: 600,
-                                                      }}
-                                                    >
-                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
-                                                    </Typography>
-                                                  );
-                                                })()}
-                                              </TableCell>
-                                              <TableCell>
-                                                <Box display="flex" gap={1}>
+                                                {enrollment.approval_status === 'Pending' && (
                                                   <IconButton
                                                     size="small"
                                                     color="success"
                                                     onClick={() => handleApprove(enrollment.id)}
-                                                    title="Approve"
+                                                    title="Approve (Admin Override)"
                                                   >
-                                                    <CheckCircle fontSize="small" />
+                                                    <PersonAdd fontSize="small" />
                                                   </IconButton>
-                                                  <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => handleReject(enrollment.id)}
-                                                    title="Reject"
-                                                  >
-                                                    <Cancel fontSize="small" />
-                                                  </IconButton>
-                                                </Box>
+                                                )}
                                               </TableCell>
                                             </TableRow>
                                           ))}
