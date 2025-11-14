@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
 import aiofiles
 from datetime import datetime
+import pandas as pd
+import io
 from app.db.base import get_db
 from app.models.student import Student
 from app.schemas.student import StudentCreate, StudentResponse
@@ -366,4 +369,172 @@ def get_student_count(
     
     count = query.count()
     return {"count": count, "is_active": is_active}
+
+@router.get("/report/overall")
+def generate_overall_report(db: Session = Depends(get_db)):
+    """Generate an Excel report with all employee enrollment history (active employees only)."""
+    try:
+        from app.models.enrollment import Enrollment, ApprovalStatus, CompletionStatus, EligibilityStatus
+        from app.models.course import Course
+        from app.services.eligibility_service import EligibilityService
+        
+        # Get all active students
+        active_students = db.query(Student).filter(Student.is_active == True).all()
+        
+        # Prepare data for Excel - one row per enrollment
+        report_data = []
+        
+        for student in active_students:
+            # Get all enrollments for this student
+            enrollments = db.query(Enrollment).filter(
+                Enrollment.student_id == student.id
+            ).all()
+            
+            # If student has no enrollments, add one row with "No courses taken yet"
+            if not enrollments:
+                report_data.append({
+                    'bsid': student.employee_id or '',
+                    'name': student.name or '',
+                    'email': student.email or '',
+                    'sbu': student.sbu.value if student.sbu else '',
+                    'designation': student.designation or '',
+                    'course_name': 'No courses taken yet',
+                    'batch_code': 'N/A',
+                    'attendance': 'N/A',
+                    'score': 'N/A',
+                    'completion_status': 'N/A',
+                    'approval_date': 'N/A',
+                    'completion_date': 'N/A',
+                    'withdrawn': 'N/A',
+                })
+                continue
+            
+            for enrollment in enrollments:
+                # Get course name and batch code (use denormalized values if available)
+                course_name = enrollment.course_name or (enrollment.course.name if enrollment.course else '')
+                batch_code = enrollment.batch_code or (enrollment.course.batch_code if enrollment.course else '')
+                
+                # Get attendance as percentage (present/total_attendance * 100)
+                attendance = ''
+                if enrollment.total_attendance and enrollment.total_attendance > 0 and enrollment.present is not None:
+                    attendance_percentage = (enrollment.present / enrollment.total_attendance * 100)
+                    attendance = f"{attendance_percentage:.1f}%"
+                elif enrollment.attendance_percentage is not None:
+                    attendance = f"{enrollment.attendance_percentage:.1f}%"
+                elif enrollment.attendance_status:
+                    attendance = enrollment.attendance_status
+                else:
+                    attendance = ''
+                
+                # Get score as percentage
+                score = ''
+                if enrollment.score is not None:
+                    score = f"{enrollment.score}%"
+                else:
+                    score = ''
+                
+                # Get completion status (map to required values: COMPLETED, FAILED, WITHDRAWN, PENDING, INELIGIBLE)
+                if enrollment.approval_status == ApprovalStatus.WITHDRAWN:
+                    completion_status = 'WITHDRAWN'
+                elif enrollment.eligibility_status in [EligibilityStatus.INELIGIBLE_PREREQUISITE, EligibilityStatus.INELIGIBLE_DUPLICATE, EligibilityStatus.INELIGIBLE_ANNUAL_LIMIT]:
+                    completion_status = 'INELIGIBLE'
+                elif enrollment.approval_status == ApprovalStatus.PENDING:
+                    completion_status = 'PENDING'
+                elif enrollment.completion_status == CompletionStatus.COMPLETED:
+                    completion_status = 'COMPLETED'
+                elif enrollment.completion_status == CompletionStatus.FAILED:
+                    completion_status = 'FAILED'
+                else:
+                    completion_status = 'PENDING'  # Default for NOT_STARTED, IN_PROGRESS, etc.
+                
+                # Get approval date (format as YYYY-MM-DD)
+                approval_date = ''
+                if enrollment.approved_at:
+                    approval_date = enrollment.approved_at.strftime('%Y-%m-%d')
+                
+                # Get completion date (format as YYYY-MM-DD)
+                completion_date = ''
+                if enrollment.completion_date:
+                    completion_date = enrollment.completion_date.strftime('%Y-%m-%d')
+                
+                # Check if withdrawn
+                withdrawn = enrollment.approval_status == ApprovalStatus.WITHDRAWN
+                
+                report_data.append({
+                    'bsid': student.employee_id or '',
+                    'name': student.name or '',
+                    'email': student.email or '',
+                    'sbu': student.sbu.value if student.sbu else '',
+                    'designation': student.designation or '',
+                    'course_name': course_name,
+                    'batch_code': batch_code,
+                    'attendance': attendance,
+                    'score': score,
+                    'completion_status': completion_status,
+                    'approval_date': approval_date,
+                    'completion_date': completion_date,
+                    'withdrawn': 'TRUE' if withdrawn else 'FALSE',
+                })
+        
+        # Create DataFrame
+        df = pd.DataFrame(report_data)
+        
+        # If no enrollments, create empty DataFrame with columns
+        if df.empty:
+            df = pd.DataFrame(columns=[
+                'bsid', 'name', 'email', 'sbu', 'designation',
+                'course_name', 'batch_code', 'attendance', 'score',
+                'completion_status', 'approval_date', 'completion_date',
+                'withdrawn'
+            ])
+        else:
+            # Sort by bsid ascending, then approval_date descending
+            # Convert approval_date to datetime for proper sorting, handling empty strings
+            df['approval_date_sort'] = pd.to_datetime(df['approval_date'], errors='coerce')
+            df = df.sort_values(
+                by=['bsid', 'approval_date_sort'],
+                ascending=[True, False],
+                na_position='last'
+            )
+            # Drop the temporary sort column
+            df = df.drop(columns=['approval_date_sort'])
+            # Reset index
+            df = df.reset_index(drop=True)
+        
+        # Create Excel file in memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Training History', index=False)
+            
+            # Auto-adjust column widths
+            worksheet = writer.sheets['Training History']
+            from openpyxl.utils import get_column_letter
+            for idx, col in enumerate(df.columns):
+                max_length = max(
+                    df[col].astype(str).map(len).max() if not df.empty else 0,
+                    len(str(col))
+                )
+                column_letter = get_column_letter(idx + 1)
+                worksheet.column_dimensions[column_letter].width = min(max_length + 2, 50)
+        
+        output.seek(0)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"training_history_report_{timestamp}.xlsx"
+        
+        # Read the content
+        file_content = output.read()
+        output.close()
+        
+        return StreamingResponse(
+            io.BytesIO(file_content),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error generating overall report: {error_details}")
+        raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
 

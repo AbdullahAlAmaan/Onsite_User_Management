@@ -49,45 +49,21 @@ function Dashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch all data in parallel
-      const [
-        activeEmployeesRes,
-        previousEmployeesRes,
-        activeCoursesRes,
-        archivedCoursesRes,
-        allEnrollmentsRes,
-      ] = await Promise.all([
-        studentsAPI.getCount({ is_active: true }),
-        studentsAPI.getCount({ is_active: false }),
-        coursesAPI.getAll({ archived: false }),
-        coursesAPI.getAll({ archived: true }),
-        enrollmentsAPI.getAll({ limit: 1000 }),
-      ]);
-
-      const enrollments = allEnrollmentsRes.data;
-      
-      // Calculate enrollment statistics
-      const approved = enrollments.filter(e => e.approval_status === 'Approved').length;
-      const pending = enrollments.filter(e => e.approval_status === 'Pending').length;
-      const withdrawn = enrollments.filter(e => e.approval_status === 'Withdrawn').length;
-      const completed = enrollments.filter(e => 
-        e.approval_status === 'Approved' && e.completion_status === 'Completed'
-      ).length;
-      const notEligible = enrollments.filter(e => 
-        e.eligibility_status !== 'Eligible' && e.approval_status !== 'Approved' && e.approval_status !== 'Withdrawn'
-      ).length;
+      // Fetch dashboard statistics from backend
+      const statsRes = await enrollmentsAPI.getDashboardStats();
+      const statsData = statsRes.data;
 
       setStats({
-        activeEmployees: activeEmployeesRes.data.count,
-        previousEmployees: previousEmployeesRes.data.count,
-        activeCourses: activeCoursesRes.data.length,
-        archivedCourses: archivedCoursesRes.data.length,
-        totalEnrollments: enrollments.length,
-        approvedEnrollments: approved,
-        pendingEnrollments: pending,
-        withdrawnEnrollments: withdrawn,
-        completedEnrollments: completed,
-        notEligibleEnrollments: notEligible,
+        activeEmployees: statsData.active_employees || 0,
+        previousEmployees: statsData.previous_employees || 0,
+        activeCourses: statsData.active_courses || 0,
+        archivedCourses: statsData.archived_courses || 0,
+        totalEnrollments: statsData.total_enrollments || 0,
+        approvedEnrollments: statsData.approved_enrollments || 0,
+        pendingEnrollments: statsData.pending_enrollments || 0,
+        withdrawnEnrollments: statsData.withdrawn_enrollments || 0,
+        completedEnrollments: statsData.completed_enrollments || 0,
+        notEligibleEnrollments: statsData.not_eligible_enrollments || 0,
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -213,7 +189,7 @@ function Dashboard() {
 
       {/* Main Statistics Cards */}
       <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard
             title="Active Employees"
             value={stats.activeEmployees}
@@ -223,7 +199,7 @@ function Dashboard() {
             subtitle="Currently active"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard
             title="Previous Employees"
             value={stats.previousEmployees}
@@ -233,7 +209,7 @@ function Dashboard() {
             subtitle="Inactive employees"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <StatCard
             title="Active Courses"
             value={stats.activeCourses}
@@ -241,15 +217,6 @@ function Dashboard() {
             color={theme.palette.success.main}
             onClick={() => navigate('/courses')}
             subtitle="Currently available"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Enrollments"
-            value={stats.totalEnrollments}
-            icon={<Assignment sx={{ fontSize: 32, color: theme.palette.info.main }} />}
-            color={theme.palette.info.main}
-            subtitle="All time enrollments"
           />
         </Grid>
       </Grid>
@@ -266,16 +233,8 @@ function Dashboard() {
         <CardContent>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
             <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Enrollment Status Overview
+              Enrollment Status 
             </Typography>
-            <Button
-              variant="outlined"
-              size="small"
-              endIcon={<ArrowForward />}
-              onClick={() => navigate('/courses')}
-            >
-              View All Courses
-            </Button>
           </Box>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={4}>
@@ -283,7 +242,6 @@ function Dashboard() {
                 title="Approved Enrollments"
                 value={stats.approvedEnrollments}
                 color={theme.palette.success.main}
-                onClick={() => navigate('/courses')}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
@@ -291,15 +249,6 @@ function Dashboard() {
                 title="Pending Approvals"
                 value={stats.pendingEnrollments}
                 color={theme.palette.warning.main}
-                onClick={() => navigate('/courses')}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <EnrollmentStatCard
-                title="Completed Courses"
-                value={stats.completedEnrollments}
-                color={theme.palette.success.main}
-                onClick={() => navigate('/courses')}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
@@ -307,7 +256,6 @@ function Dashboard() {
                 title="Withdrawn"
                 value={stats.withdrawnEnrollments}
                 color={theme.palette.error.main}
-                onClick={() => navigate('/courses')}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
@@ -315,84 +263,7 @@ function Dashboard() {
                 title="Not Eligible"
                 value={stats.notEligibleEnrollments}
                 color={theme.palette.error.main}
-                onClick={() => navigate('/courses')}
               />
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <EnrollmentStatCard
-                title="Archived Courses"
-                value={stats.archivedCourses}
-                color={theme.palette.grey[600]}
-                onClick={() => navigate('/courses')}
-              />
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card
-        sx={{
-          borderRadius: 3,
-          boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-        }}
-      >
-        <CardContent>
-          <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-            Quick Actions
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={4}>
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                startIcon={<People />}
-                onClick={() => navigate('/users')}
-                sx={{
-                  py: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  borderRadius: 2,
-                }}
-              >
-                Manage Employees
-              </Button>
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                startIcon={<School />}
-                onClick={() => navigate('/courses')}
-                sx={{
-                  py: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  borderRadius: 2,
-                }}
-              >
-                Manage Courses
-              </Button>
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <Button
-                fullWidth
-                variant="outlined"
-                size="large"
-                startIcon={<Pending />}
-                onClick={() => navigate('/courses')}
-                sx={{
-                  py: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  borderRadius: 2,
-                }}
-              >
-                Review Pending Approvals
-              </Button>
             </Grid>
           </Grid>
         </CardContent>

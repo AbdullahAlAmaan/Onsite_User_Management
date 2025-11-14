@@ -7,7 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 60000, // 60 second timeout for large reports
 });
 
 // Initialize token from localStorage if available
@@ -63,6 +63,7 @@ export const enrollmentsAPI = {
   bulkApprove: (data, approvedBy) => api.post('/enrollments/approve/bulk', data, { params: { approved_by: approvedBy } }),
   withdraw: (id, reason, withdrawnBy) => api.post(`/enrollments/${id}/withdraw`, null, { params: { withdrawal_reason: reason, withdrawn_by: withdrawnBy } }),
   reapprove: (id, approvedBy) => api.post(`/enrollments/${id}/reapprove`, null, { params: { approved_by: approvedBy } }),
+  getDashboardStats: () => api.get('/enrollments/dashboard/stats'),
 };
 
 export const coursesAPI = {
@@ -84,6 +85,7 @@ export const studentsAPI = {
   getCount: (params) => api.get('/students/count', { params }),
   remove: (id) => api.post(`/students/${id}/remove`),
   restore: (id) => api.post(`/students/${id}/restore`),
+  generateOverallReport: () => api.get('/students/report/overall', { responseType: 'blob' }),
   importExcel: (file) => {
     const formData = new FormData();
     formData.append('file', file);

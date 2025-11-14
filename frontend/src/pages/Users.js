@@ -27,7 +27,7 @@ import {
   InputAdornment,
   Autocomplete,
 } from '@mui/material';
-import { ExpandMore, ExpandLess, PersonAdd, UploadFile, Visibility, PersonRemove, Search, Download } from '@mui/icons-material';
+import { ExpandMore, ExpandLess, PersonAdd, UploadFile, Visibility, PersonRemove, Search, Download, Description } from '@mui/icons-material';
 import { studentsAPI } from '../services/api';
 import UserDetailsDialog from '../components/UserDetailsDialog';
 
@@ -125,7 +125,8 @@ function Users() {
       setAllUsers(fetchedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
-      setMessage({ type: 'error', text: 'Error fetching users' });
+      const errorMessage = error.response?.data?.detail || error.message || 'Error fetching users';
+      setMessage({ type: 'error', text: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -241,6 +242,69 @@ function Users() {
     setImportResults(null);
   };
 
+  const handleGenerateOverallReport = async () => {
+    try {
+      setMessage(null);
+      const response = await studentsAPI.generateOverallReport();
+      
+      // Check if response is actually a blob
+      if (response.data instanceof Blob) {
+        const blob = response.data;
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `training_history_report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        setMessage({ type: 'success', text: 'Report generated successfully' });
+      } else {
+        // If not a blob, try to create one from the data
+        const blob = new Blob([response.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `training_history_report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        setMessage({ type: 'success', text: 'Report generated successfully' });
+      }
+    } catch (error) {
+      console.error('Error generating report:', error);
+      let errorMessage = 'Error generating report';
+      if (error.response) {
+        if (error.response.data instanceof Blob) {
+          // Try to read the blob as text to get error message
+          try {
+            const text = await error.response.data.text();
+            try {
+              const json = JSON.parse(text);
+              errorMessage = json.detail || errorMessage;
+            } catch {
+              errorMessage = text || errorMessage;
+            }
+          } catch (blobError) {
+            errorMessage = 'Error generating report: Invalid response format';
+          }
+        } else if (error.response.data?.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.status) {
+          errorMessage = `Error generating report: ${error.response.status} ${error.response.statusText || ''}`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      setMessage({ type: 'error', text: errorMessage });
+    }
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
@@ -270,6 +334,18 @@ function Users() {
           </Typography>
         </Box>
         <Box display="flex" gap={2}>
+          <Button
+            variant="outlined"
+            startIcon={<Description />}
+            onClick={handleGenerateOverallReport}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500,
+            }}
+          >
+            Generate Overall Report
+          </Button>
           <Button
             variant="outlined"
             startIcon={<UploadFile />}

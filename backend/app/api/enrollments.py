@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime
 from app.db.base import get_db
-from app.models.enrollment import Enrollment, ApprovalStatus
+from app.models.enrollment import Enrollment, ApprovalStatus, CompletionStatus, EligibilityStatus
 from app.models.course import Course
+from app.models.student import Student
 from app.schemas.enrollment import EnrollmentResponse, EnrollmentApproval, EnrollmentBulkApproval, EnrollmentCreate
 from app.services.eligibility_service import EligibilityService
-from app.models.enrollment import EligibilityStatus
 
 router = APIRouter()
 
@@ -431,6 +432,63 @@ def create_enrollment(
     enrollment_dict['course_description'] = enrollment.course.description
     
     return EnrollmentResponse(**enrollment_dict)
+
+@router.get("/dashboard/stats")
+def get_dashboard_stats(db: Session = Depends(get_db)):
+    """Get dashboard statistics including counts for employees, courses, and enrollments."""
+    # Count active and previous employees
+    active_employees_count = db.query(Student).filter(Student.is_active == True).count()
+    previous_employees_count = db.query(Student).filter(Student.is_active == False).count()
+    
+    # Count active and archived courses
+    active_courses_count = db.query(Course).filter(Course.is_archived == False).count()
+    archived_courses_count = db.query(Course).filter(Course.is_archived == True).count()
+    
+    # Count total enrollments
+    total_enrollments_count = db.query(Enrollment).count()
+    
+    # Count enrollments by approval status
+    approved_enrollments_count = db.query(Enrollment).filter(
+        Enrollment.approval_status == ApprovalStatus.APPROVED
+    ).count()
+    
+    pending_enrollments_count = db.query(Enrollment).filter(
+        Enrollment.approval_status == ApprovalStatus.PENDING
+    ).count()
+    
+    withdrawn_enrollments_count = db.query(Enrollment).filter(
+        Enrollment.approval_status == ApprovalStatus.WITHDRAWN
+    ).count()
+    
+    # Count completed enrollments (approved and completed)
+    completed_enrollments_count = db.query(Enrollment).filter(
+        Enrollment.approval_status == ApprovalStatus.APPROVED,
+        Enrollment.completion_status == CompletionStatus.COMPLETED
+    ).count()
+    
+    # Count not eligible enrollments (ineligible and not approved/withdrawn)
+    not_eligible_enrollments_count = db.query(Enrollment).filter(
+        Enrollment.eligibility_status.in_([
+            EligibilityStatus.INELIGIBLE_PREREQUISITE,
+            EligibilityStatus.INELIGIBLE_DUPLICATE,
+            EligibilityStatus.INELIGIBLE_ANNUAL_LIMIT
+        ]),
+        Enrollment.approval_status != ApprovalStatus.APPROVED,
+        Enrollment.approval_status != ApprovalStatus.WITHDRAWN
+    ).count()
+    
+    return {
+        "active_employees": active_employees_count,
+        "previous_employees": previous_employees_count,
+        "active_courses": active_courses_count,
+        "archived_courses": archived_courses_count,
+        "total_enrollments": total_enrollments_count,
+        "approved_enrollments": approved_enrollments_count,
+        "pending_enrollments": pending_enrollments_count,
+        "withdrawn_enrollments": withdrawn_enrollments_count,
+        "completed_enrollments": completed_enrollments_count,
+        "not_eligible_enrollments": not_eligible_enrollments_count,
+    }
 
 @router.get("/{enrollment_id}", response_model=EnrollmentResponse)
 def get_enrollment(enrollment_id: int, db: Session = Depends(get_db)):
