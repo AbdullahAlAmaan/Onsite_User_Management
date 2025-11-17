@@ -1118,7 +1118,7 @@ function Courses() {
                                       fontWeight: 600,
                                     }}
                                   >
-                                    Approved/Enrolled Students ({courseEnrollments[course.id].filter(e => {
+                                    Enrolled Students ({courseEnrollments[course.id].filter(e => {
                                       if (e.approval_status !== 'Approved') return false;
                                       if (selectedSBU && e.student_sbu !== selectedSBU) return false;
                                       return true;
