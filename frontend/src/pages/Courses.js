@@ -38,6 +38,8 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { coursesAPI, mentorsAPI } from '../services/api';
 import AssignInternalMentorDialog from '../components/AssignInternalMentorDialog';
 import AddExternalMentorDialog from '../components/AddExternalMentorDialog';
+import { getCourseStatus } from '../utils/courseUtils';
+import { formatDateForAPI } from '../utils/dateUtils';
 
 function Courses({ status = 'ongoing' }) {
   const theme = useTheme();
@@ -78,34 +80,6 @@ function Courses({ status = 'ongoing' }) {
     }
   }, [open]);
 
-  const getCourseStatus = (course) => {
-    // Use status field if available, otherwise fall back to date-based logic
-    if (course.status) {
-      const statusStr = String(course.status).toLowerCase();
-      // Map 'draft' status to 'planning' for display
-      if (statusStr === 'draft') {
-        return 'planning';
-      }
-      // Map enum values to lowercase strings
-      return statusStr;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const startDate = new Date(course.start_date);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = course.end_date ? new Date(course.end_date) : null;
-    if (endDate) {
-      endDate.setHours(0, 0, 0, 0);
-    }
-
-    if (startDate > today) {
-      return 'planning';
-    } else if (endDate && endDate < today) {
-      return 'completed';
-    } else {
-      return 'ongoing';
-    }
-  };
 
   const fetchCourses = async () => {
     setLoading(true);
@@ -232,8 +206,8 @@ function Courses({ status = 'ongoing' }) {
       // Create the course first
       const response = await coursesAPI.create({
         ...formData,
-        start_date: formData.start_date?.toISOString().split('T')[0],
-        end_date: formData.end_date?.toISOString().split('T')[0],
+        start_date: formatDateForAPI(formData.start_date),
+        end_date: formatDateForAPI(formData.end_date),
         total_classes_offered: formData.total_classes_offered ? parseInt(formData.total_classes_offered) : null,
         prerequisite_course_id: formData.prerequisite_course_id || null,
         status: courseStatus,
@@ -789,21 +763,17 @@ function Courses({ status = 'ongoing' }) {
                 label={
                   <Box>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      Create as Planning Course (Draft)
+                      Create as Draft
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {createAsDraft 
-                        ? 'Course will be created in planning stage. You can assign mentors, set costs, and add comments before approving it to move to ongoing courses.'
-                        : 'Course will be created directly as ongoing. All mentor assignments and costs will be permanent immediately.'}
+                        ? 'Course will be created in planning stage.'
+                        : 'Course will be created directly as ongoing.'}
                     </Typography>
                   </Box>
                 }
               />
-              {!createAsDraft && (
-                <Alert severity="info" sx={{ mt: 1 }}>
-                  Direct creation will make all mentor assignments and costs permanent. Consider using Planning mode if you need to review before making it official.
-                </Alert>
-              )}
+              {!createAsDraft}
             </Box>
             
             <Divider sx={{ my: 2 }} />

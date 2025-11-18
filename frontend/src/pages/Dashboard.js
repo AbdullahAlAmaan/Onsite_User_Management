@@ -35,6 +35,8 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { studentsAPI, coursesAPI, enrollmentsAPI } from '../services/api';
+import { getCourseStatus } from '../utils/courseUtils';
+import { formatDateRange as formatDateRangeUtil, formatDateForDisplay } from '../utils/dateUtils';
 
 function Dashboard() {
   const theme = useTheme();
@@ -65,36 +67,6 @@ function Dashboard() {
     fetchDashboardData();
   }, [timePeriod, startDate, endDate]);
 
-  const getCourseStatus = (course) => {
-    // Use status field if available, otherwise fall back to date-based logic
-    if (course.status) {
-      const statusStr = String(course.status).toLowerCase();
-      // Map 'draft' status to 'planning' for display
-      if (statusStr === 'draft') {
-        return 'planning';
-      }
-      // Map enum values to lowercase strings
-      return statusStr;
-    }
-    
-    // Fallback to date-based logic if status field is not available
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const startDate = new Date(course.start_date);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = course.end_date ? new Date(course.end_date) : null;
-    if (endDate) {
-      endDate.setHours(0, 0, 0, 0);
-    }
-
-    if (startDate > today) {
-      return 'planning';
-    } else if (endDate && endDate < today) {
-      return 'completed';
-    } else {
-      return 'ongoing';
-    }
-  };
 
   const getDateRange = () => {
     const today = new Date();
@@ -127,16 +99,7 @@ function Dashboard() {
     const dateRange = getDateRange();
     if (!dateRange) return 'All Time';
     
-    const start = dateRange.start;
-    const end = dateRange.end;
-    
-    const startStr = start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    const endStr = end.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    
-    if (startStr === endStr) {
-      return startStr;
-    }
-    return `${startStr} - ${endStr}`;
+    return formatDateRangeUtil(dateRange.start, dateRange.end);
   };
 
   const fetchDashboardData = async () => {
@@ -162,13 +125,47 @@ function Dashboard() {
         const periodStart = dateRange.start;
         const periodEnd = dateRange.end;
         
-        // Re-filter all courses based on period logic
+        // Re-filter all courses based on period logic, but respect status field first
         filteredOngoing = allCourses.filter(c => {
+          // First check the status field - if it's 'ongoing', include it if dates match
+          const statusStr = c.status ? String(c.status).toLowerCase() : '';
+          const isOngoingStatus = statusStr === 'ongoing';
+          
+          // If course has status 'ongoing', check if it's active during the period
+          if (isOngoingStatus) {
+            const courseStartDate = new Date(c.start_date);
+            courseStartDate.setHours(0, 0, 0, 0);
+            const courseEndDate = c.end_date ? new Date(c.end_date) : null;
+            if (courseEndDate) {
+              courseEndDate.setHours(0, 0, 0, 0);
+            }
+            
+            // If course has an end date within the period, it might be completed, not ongoing
+            if (courseEndDate && courseEndDate >= periodStart && courseEndDate <= periodEnd) {
+              // But if status is explicitly 'ongoing', still include it
+              return true;
+            }
+            
+            // Course must have started by the end of the period
+            const startedByPeriodEnd = courseStartDate <= periodEnd;
+            if (!startedByPeriodEnd) {
+              return false;
+            }
+            
+            return true;
+          }
+          
+          // For courses without explicit 'ongoing' status, use date-based logic
           const courseStartDate = new Date(c.start_date);
           courseStartDate.setHours(0, 0, 0, 0);
           const courseEndDate = c.end_date ? new Date(c.end_date) : null;
           if (courseEndDate) {
             courseEndDate.setHours(0, 0, 0, 0);
+          }
+          
+          // Exclude draft/completed courses
+          if (statusStr === 'draft' || statusStr === 'completed') {
+            return false;
           }
           
           // If course has an end date within the period, it's completed, not ongoing
@@ -177,8 +174,6 @@ function Dashboard() {
           }
           
           // Ongoing: Course is active during the period
-          // - Started before or during the period AND
-          // - (Ends after the period OR has no end date)
           const startedByPeriodEnd = courseStartDate <= periodEnd;
           const endsAfterPeriod = courseEndDate ? courseEndDate > periodEnd : true;
           const noEndDate = !courseEndDate;
@@ -195,19 +190,46 @@ function Dashboard() {
         
         // Completed: Course ended within the period
         filteredCompleted = allCourses.filter(c => {
+          // First check the status field - if it's 'completed', include it if dates match
+          const statusStr = c.status ? String(c.status).toLowerCase() : '';
+          const isCompletedStatus = statusStr === 'completed';
+          
           const courseEndDate = c.end_date ? new Date(c.end_date) : null;
-          if (!courseEndDate) {
+          if (!courseEndDate && !isCompletedStatus) {
             return false;
           }
-          courseEndDate.setHours(0, 0, 0, 0);
-          // End date must be within the period
-          return courseEndDate >= periodStart && courseEndDate <= periodEnd;
+          
+          if (courseEndDate) {
+            courseEndDate.setHours(0, 0, 0, 0);
+            // If status is 'completed', include if end date is in period
+            if (isCompletedStatus) {
+              return courseEndDate >= periodStart && courseEndDate <= periodEnd;
+            }
+            // Otherwise use date-based logic
+            return courseEndDate >= periodStart && courseEndDate <= periodEnd;
+          }
+          
+          // If status is 'completed' but no end date, include it
+          return isCompletedStatus;
         });
         
         // Planning: Everything that is not completed and not ongoing
-        // - Courses that haven't started yet (start date is after the period)
-        // - OR courses with draft status
+        // - Courses with draft status
+        // - OR courses that haven't started yet (start date is after the period)
         filteredPlanning = allCourses.filter(c => {
+          const statusStr = c.status ? String(c.status).toLowerCase() : '';
+          
+          // Exclude courses with explicit 'ongoing' or 'completed' status
+          if (statusStr === 'ongoing' || statusStr === 'completed') {
+            return false;
+          }
+          
+          // Include draft courses
+          if (statusStr === 'draft') {
+            return true;
+          }
+          
+          // For courses without explicit status, use date-based logic
           const courseStartDate = new Date(c.start_date);
           courseStartDate.setHours(0, 0, 0, 0);
           const courseEndDate = c.end_date ? new Date(c.end_date) : null;
@@ -226,12 +248,6 @@ function Dashboard() {
           const noEndDate = !courseEndDate;
           if (startedByPeriodEnd && (endsAfterPeriod || noEndDate)) {
             return false;
-          }
-          
-          // Check if it's a draft course
-          const statusStr = c.status ? String(c.status).toLowerCase() : '';
-          if (statusStr === 'draft') {
-            return true;
           }
           
           // If course starts after the period, it's planning
@@ -357,7 +373,7 @@ function Dashboard() {
                       }
                       secondary={
                         <Typography variant="caption" color="text.secondary">
-                          {course.batch_code} • {new Date(course.start_date).toLocaleDateString()}
+                          {course.batch_code} • {formatDateForDisplay(new Date(course.start_date))}
                         </Typography>
                       }
                     />

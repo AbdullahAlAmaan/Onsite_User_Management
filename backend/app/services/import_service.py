@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy.orm import Session
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, date
 from app.models.enrollment import IncomingEnrollment
 from app.models.student import Student, SBU
 from app.models.course import Course
@@ -29,6 +29,13 @@ class ImportService:
                     'sbu': str(row.get('sbu', '')).strip() if pd.notna(row.get('sbu')) else '',
                     'designation': str(row.get('designation', '')).strip() if pd.notna(row.get('designation')) else '',
                 }
+                # Handle career_start_date
+                if pd.notna(row.get('career_start_date')):
+                    record['career_start_date'] = row.get('career_start_date')
+                # Handle bs_join_date or bs_joining_date (both variations)
+                bs_date = row.get('bs_join_date') if pd.notna(row.get('bs_join_date')) else row.get('bs_joining_date')
+                if pd.notna(bs_date):
+                    record['bs_joining_date'] = bs_date
                 records.append(record)
             
             return records
@@ -51,6 +58,13 @@ class ImportService:
                     'sbu': str(row.get('sbu', '')).strip() if pd.notna(row.get('sbu')) else '',
                     'designation': str(row.get('designation', '')).strip() if pd.notna(row.get('designation')) else '',
                 }
+                # Handle career_start_date
+                if pd.notna(row.get('career_start_date')):
+                    record['career_start_date'] = row.get('career_start_date')
+                # Handle bs_join_date or bs_joining_date (both variations)
+                bs_date = row.get('bs_join_date') if pd.notna(row.get('bs_join_date')) else row.get('bs_joining_date')
+                if pd.notna(bs_date):
+                    record['bs_joining_date'] = bs_date
                 records.append(record)
             
             return records
@@ -157,6 +171,31 @@ class ImportService:
                     results['not_found'] += 1
                     continue
                 
+                # Update student's career_start_date and bs_joining_date if provided
+                if record.get('career_start_date'):
+                    try:
+                        if isinstance(record['career_start_date'], str):
+                            career_date = pd.to_datetime(record['career_start_date']).date()
+                        elif isinstance(record['career_start_date'], (datetime, pd.Timestamp)):
+                            career_date = record['career_start_date'].date() if hasattr(record['career_start_date'], 'date') else pd.to_datetime(record['career_start_date']).date()
+                        else:
+                            career_date = record['career_start_date']
+                        student.career_start_date = career_date
+                    except Exception:
+                        pass  # Skip if date parsing fails
+                
+                if record.get('bs_joining_date'):
+                    try:
+                        if isinstance(record['bs_joining_date'], str):
+                            bs_date = pd.to_datetime(record['bs_joining_date']).date()
+                        elif isinstance(record['bs_joining_date'], (datetime, pd.Timestamp)):
+                            bs_date = record['bs_joining_date'].date() if hasattr(record['bs_joining_date'], 'date') else pd.to_datetime(record['bs_joining_date']).date()
+                        else:
+                            bs_date = record['bs_joining_date']
+                        student.bs_joining_date = bs_date
+                    except Exception:
+                        pass  # Skip if date parsing fails
+                
                 # Store in incoming_enrollments
                 incoming = IncomingEnrollment(
                     employee_id=record['employee_id'],
@@ -244,6 +283,13 @@ class ImportService:
                     'designation': str(row.get('designation', '')).strip() if pd.notna(row.get('designation')) else '',
                     'experience_years': int(row.get('experience_years', 0)) if pd.notna(row.get('experience_years')) else 0,
                 }
+                # Handle career_start_date
+                if pd.notna(row.get('career_start_date')):
+                    record['career_start_date'] = row.get('career_start_date')
+                # Handle bs_join_date or bs_joining_date (both variations)
+                bs_date = row.get('bs_join_date') if pd.notna(row.get('bs_join_date')) else row.get('bs_joining_date')
+                if pd.notna(bs_date):
+                    record['bs_joining_date'] = bs_date
                 records.append(record)
             
             return records
@@ -267,6 +313,13 @@ class ImportService:
                     'designation': str(row.get('designation', '')).strip() if pd.notna(row.get('designation')) else '',
                     'experience_years': int(row.get('experience_years', 0)) if pd.notna(row.get('experience_years')) else 0,
                 }
+                # Handle career_start_date
+                if pd.notna(row.get('career_start_date')):
+                    record['career_start_date'] = row.get('career_start_date')
+                # Handle bs_join_date or bs_joining_date (both variations)
+                bs_date = row.get('bs_join_date') if pd.notna(row.get('bs_join_date')) else row.get('bs_joining_date')
+                if pd.notna(bs_date):
+                    record['bs_joining_date'] = bs_date
                 records.append(record)
             
             return records
@@ -349,6 +402,32 @@ class ImportService:
                     if record.get('experience_years') is not None:
                         existing_student.experience_years = record['experience_years']
                     
+                    # Update career_start_date if provided
+                    if record.get('career_start_date'):
+                        try:
+                            if isinstance(record['career_start_date'], str):
+                                career_date = pd.to_datetime(record['career_start_date']).date()
+                            elif isinstance(record['career_start_date'], (datetime, pd.Timestamp)):
+                                career_date = record['career_start_date'].date() if hasattr(record['career_start_date'], 'date') else pd.to_datetime(record['career_start_date']).date()
+                            else:
+                                career_date = record['career_start_date']
+                            existing_student.career_start_date = career_date
+                        except Exception:
+                            pass  # Skip if date parsing fails
+                    
+                    # Update bs_joining_date if provided
+                    if record.get('bs_joining_date'):
+                        try:
+                            if isinstance(record['bs_joining_date'], str):
+                                bs_date = pd.to_datetime(record['bs_joining_date']).date()
+                            elif isinstance(record['bs_joining_date'], (datetime, pd.Timestamp)):
+                                bs_date = record['bs_joining_date'].date() if hasattr(record['bs_joining_date'], 'date') else pd.to_datetime(record['bs_joining_date']).date()
+                            else:
+                                bs_date = record['bs_joining_date']
+                            existing_student.bs_joining_date = bs_date
+                        except Exception:
+                            pass  # Skip if date parsing fails
+                    
                     results['updated'] += 1
                 else:
                     # Create new employee
@@ -358,13 +437,40 @@ class ImportService:
                     except:
                         sbu_enum = SBU.OTHER
                     
+                    # Parse date fields
+                    career_date = None
+                    if record.get('career_start_date'):
+                        try:
+                            if isinstance(record['career_start_date'], str):
+                                career_date = pd.to_datetime(record['career_start_date']).date()
+                            elif isinstance(record['career_start_date'], (datetime, pd.Timestamp)):
+                                career_date = record['career_start_date'].date() if hasattr(record['career_start_date'], 'date') else pd.to_datetime(record['career_start_date']).date()
+                            else:
+                                career_date = record['career_start_date']
+                        except Exception:
+                            pass  # Skip if date parsing fails
+                    
+                    bs_date = None
+                    if record.get('bs_joining_date'):
+                        try:
+                            if isinstance(record['bs_joining_date'], str):
+                                bs_date = pd.to_datetime(record['bs_joining_date']).date()
+                            elif isinstance(record['bs_joining_date'], (datetime, pd.Timestamp)):
+                                bs_date = record['bs_joining_date'].date() if hasattr(record['bs_joining_date'], 'date') else pd.to_datetime(record['bs_joining_date']).date()
+                            else:
+                                bs_date = record['bs_joining_date']
+                        except Exception:
+                            pass  # Skip if date parsing fails
+                    
                     new_student = Student(
                         employee_id=record['employee_id'],
                         name=record['name'],
                         email=record['email'],
                         sbu=sbu_enum,
                         designation=record.get('designation'),
-                        experience_years=record.get('experience_years', 0)
+                        experience_years=record.get('experience_years', 0),
+                        career_start_date=career_date,
+                        bs_joining_date=bs_date
                     )
                     db.add(new_student)
                     results['created'] += 1

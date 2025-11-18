@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDateForDisplay, formatDateTimeForDisplay } from '../utils/dateUtils';
 import {
   Dialog,
   DialogTitle,
@@ -64,7 +65,7 @@ function CourseDetailsDialog({ open, onClose, enrollment }) {
                 Start Date
               </Typography>
               <Typography variant="body1" gutterBottom>
-                {new Date(enrollment.course_start_date).toLocaleDateString()}
+                {formatDateForDisplay(enrollment.course_start_date)}
               </Typography>
             </Grid>
           )}
@@ -75,7 +76,7 @@ function CourseDetailsDialog({ open, onClose, enrollment }) {
                 End Date
               </Typography>
               <Typography variant="body1" gutterBottom>
-                {new Date(enrollment.course_end_date).toLocaleDateString()}
+                {formatDateForDisplay(enrollment.course_end_date)}
               </Typography>
             </Grid>
           )}
@@ -135,7 +136,7 @@ function CourseDetailsDialog({ open, onClose, enrollment }) {
                 Approved At
               </Typography>
               <Typography variant="body1" gutterBottom>
-                {new Date(enrollment.approved_at).toLocaleString()}
+                {formatDateTimeForDisplay(enrollment.approved_at)}
               </Typography>
             </Grid>
           )}
@@ -212,7 +213,7 @@ function CourseDetailsDialog({ open, onClose, enrollment }) {
                 Completion Date
               </Typography>
               <Typography variant="body1" gutterBottom>
-                {new Date(enrollment.completion_date).toLocaleString()}
+                {formatDateTimeForDisplay(enrollment.completion_date)}
               </Typography>
             </Grid>
           )}
@@ -222,7 +223,7 @@ function CourseDetailsDialog({ open, onClose, enrollment }) {
               Enrollment Date
             </Typography>
             <Typography variant="body1" gutterBottom>
-              {new Date(enrollment.created_at).toLocaleString()}
+              {formatDateTimeForDisplay(enrollment.created_at)}
             </Typography>
           </Grid>
         </Grid>

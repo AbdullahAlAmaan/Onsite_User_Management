@@ -74,6 +74,7 @@ import {
 import UserDetailsDialog from '../components/UserDetailsDialog';
 import AssignInternalMentorDialog from '../components/AssignInternalMentorDialog';
 import AddExternalMentorDialog from '../components/AddExternalMentorDialog';
+import { formatDateTimeForDisplay } from '../utils/dateUtils';
 
 function CourseDetail() {
   const theme = useTheme();
@@ -118,10 +119,10 @@ function CourseDetail() {
   
   // Preview data for enrollment import format
   const enrollmentPreviewData = [
-    { employee_id: 'EMP001', name: 'John Doe', email: 'john.doe@company.com', sbu: 'IT', designation: 'Manager' },
-    { employee_id: 'EMP002', name: 'Jane Smith', email: 'jane.smith@company.com', sbu: 'HR', designation: 'Employee' },
-    { employee_id: 'EMP003', name: 'Bob Wilson', email: 'bob.wilson@company.com', sbu: 'Finance', designation: 'Director' },
-    { employee_id: 'EMP004', name: 'Alice Brown', email: 'alice.brown@company.com', sbu: 'Operations', designation: 'Coordinator' },
+    { employee_id: 'EMP001', name: 'John Doe', email: 'john.doe@company.com', sbu: 'IT', designation: 'Manager', career_start_date: '15 Jan 2020', bs_join_date: '20 Mar 2021' },
+    { employee_id: 'EMP002', name: 'Jane Smith', email: 'jane.smith@company.com', sbu: 'HR', designation: 'Employee', career_start_date: '10 Feb 2019', bs_join_date: '15 Apr 2020' },
+    { employee_id: 'EMP003', name: 'Bob Wilson', email: 'bob.wilson@company.com', sbu: 'Finance', designation: 'Director', career_start_date: '05 Mar 2018', bs_join_date: '12 May 2019' },
+    { employee_id: 'EMP004', name: 'Alice Brown', email: 'alice.brown@company.com', sbu: 'Operations', designation: 'Coordinator', career_start_date: '20 Apr 2021', bs_join_date: '25 Jun 2022' },
   ];
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
   const [attendanceFile, setAttendanceFile] = useState(null);
@@ -1477,7 +1478,7 @@ function CourseDetail() {
                           {comment.created_by}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {new Date(comment.created_at).toLocaleString()}
+                          {formatDateTimeForDisplay(comment.created_at)}
                         </Typography>
                       </Box>
                     }
@@ -1738,6 +1739,8 @@ function CourseDetail() {
                         <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>email</TableCell>
                         <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>sbu</TableCell>
                         <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>designation</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>career_start_date</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>bs_join_date</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1755,6 +1758,8 @@ function CourseDetail() {
                             <Chip label={row.sbu} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.75rem' }}>{row.designation}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem' }}>{row.career_start_date || 'N/A'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem' }}>{row.bs_join_date || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1762,8 +1767,7 @@ function CourseDetail() {
                 </TableContainer>
                 <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                    <strong>Note:</strong> Column names are case-insensitive. Required: employee_id, name, email. Optional: sbu, designation. 
-                    SBU values: IT, HR, Finance, Operations, Sales, Marketing, Other. Students must already exist in the system.
+                   
                   </Typography>
                 </Box>
               </Box>
@@ -1873,8 +1877,7 @@ function CourseDetail() {
                 </TableContainer>
                 <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                    <strong>Note:</strong> Column names are case-insensitive. Required: name/email/employee_id (one of these), total_classes_attended (or classes_attended/attended), score (0-100). 
-                    Students are matched by name, email, or employee_id.
+                   
                   </Typography>
                 </Box>
               </Box>

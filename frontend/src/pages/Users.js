@@ -33,6 +33,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { studentsAPI, mentorsAPI } from '../services/api';
 import UserDetailsDialog from '../components/UserDetailsDialog';
+import { calculateTotalExperience, calculateBSExperience } from '../utils/experienceUtils';
+import { formatDateForAPI, generateTimestampFilename, formatDateForDisplay, formatDateTimeForDisplay } from '../utils/dateUtils';
 
 function Users() {
   const theme = useTheme();
@@ -69,24 +71,6 @@ function Users() {
   const [updatingMentorStatus, setUpdatingMentorStatus] = useState({});
   const [filterMentorStatus, setFilterMentorStatus] = useState(''); // Filter: '', 'mentor', 'not_mentor'
   
-  // Calculate experience from dates
-  const calculateTotalExperience = (careerStartDate) => {
-    if (!careerStartDate) return null;
-    const start = new Date(careerStartDate);
-    const today = new Date();
-    const diffTime = Math.abs(today - start);
-    const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
-    return diffYears.toFixed(1);
-  };
-
-  const calculateBSExperience = (bsJoiningDate) => {
-    if (!bsJoiningDate) return null;
-    const start = new Date(bsJoiningDate);
-    const today = new Date();
-    const diffTime = Math.abs(today - start);
-    const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
-    return diffYears.toFixed(1);
-  };
   
   // Sample preview data from employee_data_101_200.xlsx
   const previewData = [
@@ -250,8 +234,8 @@ function Users() {
       // Format dates for API
       const studentData = {
         ...newStudent,
-        career_start_date: newStudent.career_start_date ? newStudent.career_start_date.toISOString().split('T')[0] : null,
-        bs_joining_date: newStudent.bs_joining_date ? newStudent.bs_joining_date.toISOString().split('T')[0] : null,
+        career_start_date: formatDateForAPI(newStudent.career_start_date),
+        bs_joining_date: formatDateForAPI(newStudent.bs_joining_date),
       };
       await studentsAPI.create(studentData);
       setMessage({ type: 'success', text: 'Student created successfully' });
@@ -336,7 +320,7 @@ function Users() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `training_history_report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.xlsx`);
+        link.setAttribute('download', generateTimestampFilename('training_history_report', '.xlsx'));
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -350,7 +334,7 @@ function Users() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `training_history_report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.xlsx`);
+        link.setAttribute('download', generateTimestampFilename('training_history_report', '.xlsx'));
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -876,7 +860,7 @@ function Users() {
                                                 Start Date
                                               </Typography>
                                               <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                                {new Date(enrollment.course_start_date).toLocaleDateString()}
+                                                {formatDateForDisplay(enrollment.course_start_date)}
                                               </Typography>
                                             </Box>
                                           )}
@@ -887,7 +871,7 @@ function Users() {
                                                 Completion Date
                                               </Typography>
                                               <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                                {new Date(enrollment.course_end_date).toLocaleDateString()}
+                                                {formatDateForDisplay(enrollment.course_end_date)}
                                               </Typography>
                                             </Box>
                                           )}

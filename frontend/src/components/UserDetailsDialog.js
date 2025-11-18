@@ -17,6 +17,8 @@ import {
   alpha,
 } from '@mui/material';
 import { studentsAPI } from '../services/api';
+import { formatExperience } from '../utils/experienceUtils';
+import { formatDateForDisplay } from '../utils/dateUtils';
 
 function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onApprove, onReject, onReapprove }) {
   const theme = useTheme();
@@ -154,15 +156,7 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
               Total Experience
             </Typography>
             <Typography variant="body1" gutterBottom>
-              {enrollment.student_career_start_date ? (
-                (() => {
-                  const start = new Date(enrollment.student_career_start_date);
-                  const today = new Date();
-                  const diffTime = Math.abs(today - start);
-                  const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
-                  return `${diffYears.toFixed(1)} years`;
-                })()
-              ) : 'N/A'}
+              {formatExperience(enrollment.student_career_start_date)}
             </Typography>
           </Grid>
           
@@ -171,15 +165,7 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
               BS Experience
             </Typography>
             <Typography variant="body1" gutterBottom>
-              {enrollment.student_bs_joining_date ? (
-                (() => {
-                  const start = new Date(enrollment.student_bs_joining_date);
-                  const today = new Date();
-                  const diffTime = Math.abs(today - start);
-                  const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
-                  return `${diffYears.toFixed(1)} years`;
-                })()
-              ) : 'N/A'}
+              {formatExperience(enrollment.student_bs_joining_date)}
             </Typography>
           </Grid>
           
@@ -189,7 +175,7 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
                 Career Start Date
               </Typography>
               <Typography variant="body1" gutterBottom>
-                {new Date(enrollment.student_career_start_date).toLocaleDateString()}
+                {formatDateForDisplay(enrollment.student_career_start_date)}
               </Typography>
             </Grid>
           )}
@@ -200,7 +186,7 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
                 BS Joining Date
               </Typography>
               <Typography variant="body1" gutterBottom>
-                {new Date(enrollment.student_bs_joining_date).toLocaleDateString()}
+                {formatDateForDisplay(enrollment.student_bs_joining_date)}
               </Typography>
             </Grid>
           )}
@@ -426,7 +412,7 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
                                 Start Date
                               </Typography>
                               <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                {new Date(enroll.course_start_date).toLocaleDateString()}
+                                {formatDateForDisplay(enroll.course_start_date)}
                               </Typography>
                             </Box>
                           )}
@@ -437,7 +423,7 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
                                 Completion Date
                               </Typography>
                               <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                {new Date(enroll.completion_date).toLocaleDateString()}
+                                {formatDateForDisplay(enroll.completion_date)}
                               </Typography>
                             </Box>
                           )}

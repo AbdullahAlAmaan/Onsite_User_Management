@@ -150,16 +150,7 @@ function AssignInternalMentorDialog({ open, onClose, onAssign, isDraft = false }
           }}
           inputProps={{ min: 0, step: 0.01 }}
         />
-        {isDraft && (
-          <TextField
-            fullWidth
-            value="This assignment will be saved as a draft (temporary)"
-            InputProps={{ readOnly: true }}
-            sx={{ mt: 2 }}
-            size="small"
-            helperText="Draft assignments will become permanent when the course is approved"
-          />
-        )}
+        {isDraft}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Cancel</Button>
