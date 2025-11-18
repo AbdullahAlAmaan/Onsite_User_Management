@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -18,84 +19,34 @@ import {
   Chip,
   IconButton,
   CircularProgress,
-  Collapse,
   Card,
   CardContent,
   Alert,
   useTheme,
   alpha,
+  MenuItem,
+  InputAdornment,
+  Autocomplete,
+  Divider,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
-import { Add, Edit, Archive, ExpandMore, ExpandLess, PersonRemove, History, UploadFile, People, Assessment, EventAvailable, Info, PersonAdd, Search, Delete, CheckCircle, Cancel, Visibility, Download, Description } from '@mui/icons-material';
+import { Add, Delete, Search, Download, PersonAdd, CheckCircle } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { coursesAPI, enrollmentsAPI, importsAPI, completionsAPI, studentsAPI } from '../services/api';
-import { List, ListItem, ListItemText, Grid, MenuItem, InputAdornment, Autocomplete } from '@mui/material';
-import UserDetailsDialog from '../components/UserDetailsDialog';
-import CourseDetailsDialog from '../components/CourseDetailsDialog';
+import { coursesAPI, mentorsAPI } from '../services/api';
+import AssignInternalMentorDialog from '../components/AssignInternalMentorDialog';
+import AddExternalMentorDialog from '../components/AddExternalMentorDialog';
 
-function Courses() {
+function Courses({ status = 'ongoing' }) {
   const theme = useTheme();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
+  const [allCourses, setAllCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showArchived, setShowArchived] = useState(false);
   const [open, setOpen] = useState(false);
-  const [expandedCourse, setExpandedCourse] = useState(null);
-  const [courseEnrollments, setCourseEnrollments] = useState({});
-  const [loadingEnrollments, setLoadingEnrollments] = useState({});
-  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
-  const [selectedEnrollment, setSelectedEnrollment] = useState(null);
-  const [withdrawalReason, setWithdrawalReason] = useState('');
   const [message, setMessage] = useState(null);
-  const [userDetailsOpen, setUserDetailsOpen] = useState(false);
-  const [selectedUserEnrollment, setSelectedUserEnrollment] = useState(null);
-  const [courseDetailsOpen, setCourseDetailsOpen] = useState(false);
-  const [selectedCourseEnrollment, setSelectedCourseEnrollment] = useState(null);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [selectedCourseForImport, setSelectedCourseForImport] = useState(null);
-  const [importFile, setImportFile] = useState(null);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importResults, setImportResults] = useState(null);
-  const [courseDetailsCardOpen, setCourseDetailsCardOpen] = useState(false);
-  const [selectedCourseForDetails, setSelectedCourseForDetails] = useState(null);
-  const [isEditingCourse, setIsEditingCourse] = useState(false);
-  const [editCourseData, setEditCourseData] = useState({});
-  const [editCourseLoading, setEditCourseLoading] = useState(false);
-  const [manualEnrollDialogOpen, setManualEnrollDialogOpen] = useState(false);
-  const [selectedCourseForEnroll, setSelectedCourseForEnroll] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [attendanceScoresDialogOpen, setAttendanceScoresDialogOpen] = useState(false);
-  const [selectedCourseForAttendance, setSelectedCourseForAttendance] = useState(null);
-  const [attendanceScoresFile, setAttendanceScoresFile] = useState(null);
-  const [attendanceScoresLoading, setAttendanceScoresLoading] = useState(false);
-  const [attendanceScoresResults, setAttendanceScoresResults] = useState(null);
-  const [showAttendancePreview, setShowAttendancePreview] = useState(false);
-  const [showEnrollmentPreview, setShowEnrollmentPreview] = useState(false);
-  
-  // Preview data for attendance & scores upload (from ADA2025A_completion.xlsx)
-  const attendancePreviewData = [
-    { bsid: 'EMP143', name: 'Casey Smith', email: 'casey.smith143@company.com', total_classes_attended: 30, score: 87 },
-    { bsid: 'EMP102', name: 'Morgan Williams', email: 'morgan.williams102@company.com', total_classes_attended: 29, score: 87 },
-    { bsid: 'EMP144', name: 'Reese Williams', email: 'reese.williams144@company.com', total_classes_attended: 24, score: 92 },
-    { bsid: 'EMP120', name: 'Skyler Moore', email: 'skyler.moore120@company.com', total_classes_attended: 30, score: 88 },
-    { bsid: 'EMP117', name: 'Taylor Davis', email: 'taylor.davis117@company.com', total_classes_attended: 30, score: 93 },
-  ];
-  
-  // Preview data for enrollment registration upload (from ADA2025A_registration.xlsx)
-  const enrollmentPreviewData = [
-    { employee_id: 'EMP143', name: 'Casey Smith', email: 'casey.smith143@company.com', sbu: 'Operations', designation: 'Engineer' },
-    { employee_id: 'EMP102', name: 'Morgan Williams', email: 'morgan.williams102@company.com', sbu: 'Marketing', designation: 'Engineer' },
-    { employee_id: 'EMP144', name: 'Reese Williams', email: 'reese.williams144@company.com', sbu: 'Operations', designation: 'Manager' },
-    { employee_id: 'EMP120', name: 'Skyler Moore', email: 'skyler.moore120@company.com', sbu: 'HR', designation: 'Engineer' },
-    { employee_id: 'EMP117', name: 'Taylor Davis', email: 'taylor.davis117@company.com', sbu: 'IT', designation: 'Engineer' },
-  ];
-  const [editAttendanceDialogOpen, setEditAttendanceDialogOpen] = useState(false);
-  const [selectedEnrollmentForEdit, setSelectedEnrollmentForEdit] = useState(null);
-  const [editClassesAttended, setEditClassesAttended] = useState('');
-  const [editScore, setEditScore] = useState('');
-  const [editAttendanceLoading, setEditAttendanceLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSearchCourse, setSelectedSearchCourse] = useState(null);
   const [startDateFilter, setStartDateFilter] = useState(null);
@@ -111,28 +62,103 @@ function Courses() {
     total_classes_offered: '',
     prerequisite_course_id: null,
   });
+  const [prerequisiteCourses, setPrerequisiteCourses] = useState([]);
+  const [selectedMentors, setSelectedMentors] = useState([]); // Array of { mentor_id, hours_taught, amount_paid, mentor_name, is_internal }
+  const [assignInternalMentorDialogOpen, setAssignInternalMentorDialogOpen] = useState(false);
+  const [addExternalMentorDialogOpen, setAddExternalMentorDialogOpen] = useState(false);
+  const [createAsDraft, setCreateAsDraft] = useState(true); // Default to planning/draft
 
   useEffect(() => {
     fetchCourses();
-  }, [showArchived]);
+  }, [status]);
+
+  useEffect(() => {
+    if (open) {
+      fetchPrerequisiteCourses();
+    }
+  }, [open]);
+
+  const getCourseStatus = (course) => {
+    // Use status field if available, otherwise fall back to date-based logic
+    if (course.status) {
+      const statusStr = String(course.status).toLowerCase();
+      // Map 'draft' status to 'planning' for display
+      if (statusStr === 'draft') {
+        return 'planning';
+      }
+      // Map enum values to lowercase strings
+      return statusStr;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(course.start_date);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = course.end_date ? new Date(course.end_date) : null;
+    if (endDate) {
+      endDate.setHours(0, 0, 0, 0);
+    }
+
+    if (startDate > today) {
+      return 'planning';
+    } else if (endDate && endDate < today) {
+      return 'completed';
+    } else {
+      return 'ongoing';
+    }
+  };
 
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      const response = await coursesAPI.getAll({ archived: showArchived });
-      setCourses(response.data);
+      const response = await coursesAPI.getAll();
+      const allCoursesData = response.data;
+      setAllCourses(allCoursesData);
+      
+      // Filter courses based on status
+      const filtered = allCoursesData.filter(course => {
+        const courseStatus = getCourseStatus(course);
+        return courseStatus === status;
+      });
+      
+      // Debug logging
+      if (status === 'planning') {
+        console.log('Planning courses filter:', {
+          totalCourses: allCoursesData.length,
+          filteredCount: filtered.length,
+          coursesWithDraftStatus: allCoursesData.filter(c => c.status === 'draft' || String(c.status).toLowerCase() === 'draft').length,
+          sampleStatuses: allCoursesData.slice(0, 5).map(c => ({ id: c.id, name: c.name, status: c.status, computedStatus: getCourseStatus(c) }))
+        });
+      }
+      
+      setCourses(filtered);
     } catch (error) {
       console.error('Error fetching courses:', error);
+      setMessage({ type: 'error', text: 'Error fetching courses' });
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter courses based on search query and date filters
+  const fetchPrerequisiteCourses = async () => {
+    try {
+      const response = await coursesAPI.getAll();
+      // Only show ongoing and planning courses as prerequisites
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const available = response.data.filter(course => {
+        const status = getCourseStatus(course);
+        return status === 'ongoing' || status === 'planning';
+      });
+      setPrerequisiteCourses(available);
+    } catch (error) {
+      console.error('Error fetching prerequisite courses:', error);
+    }
+  };
+
+
   const filteredCourses = useMemo(() => {
     let filtered = [...courses];
     
-    // Filter by search query if provided (only if not using autocomplete selection)
     if (searchQuery.trim() && !selectedSearchCourse) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(course => 
@@ -140,30 +166,25 @@ function Courses() {
         course.batch_code?.toLowerCase().includes(query)
       );
     } else if (selectedSearchCourse) {
-      // If a course is selected from autocomplete, show only that course
       filtered = filtered.filter(course => course.id === selectedSearchCourse.id);
     }
     
-    // Filter by start date
     if (startDateFilter) {
       const filterDate = new Date(startDateFilter);
       filterDate.setHours(0, 0, 0, 0);
       filtered = filtered.filter(course => {
-        if (!course.start_date) return false;
         const courseDate = new Date(course.start_date);
         courseDate.setHours(0, 0, 0, 0);
         return courseDate >= filterDate;
       });
     }
     
-    // Filter by end date
     if (endDateFilter) {
       const filterDate = new Date(endDateFilter);
       filterDate.setHours(23, 59, 59, 999);
       filtered = filtered.filter(course => {
-        if (!course.end_date) return false;
-        const courseDate = new Date(course.end_date);
-        courseDate.setHours(23, 59, 59, 999);
+        const courseDate = new Date(course.start_date);
+        courseDate.setHours(0, 0, 0, 0);
         return courseDate <= filterDate;
       });
     }
@@ -172,6 +193,18 @@ function Courses() {
   }, [courses, searchQuery, selectedSearchCourse, startDateFilter, endDateFilter]);
 
   const handleOpen = () => {
+    setFormData({
+      name: '',
+      batch_code: '',
+      description: '',
+      start_date: null,
+      end_date: null,
+      seat_limit: 0,
+      total_classes_offered: '',
+      prerequisite_course_id: null,
+    });
+    setSelectedMentors([]);
+    setCreateAsDraft(true); // Default to planning/draft
     setOpen(true);
   };
 
@@ -187,40 +220,132 @@ function Courses() {
       total_classes_offered: '',
       prerequisite_course_id: null,
     });
+    setSelectedMentors([]);
+    setCreateAsDraft(true); // Reset to default
   };
 
   const handleSubmit = async () => {
     try {
-      await coursesAPI.create({
+      // Determine course status based on checkbox
+      const courseStatus = createAsDraft ? 'draft' : 'ongoing';
+      
+      // Create the course first
+      const response = await coursesAPI.create({
         ...formData,
         start_date: formData.start_date?.toISOString().split('T')[0],
         end_date: formData.end_date?.toISOString().split('T')[0],
         total_classes_offered: formData.total_classes_offered ? parseInt(formData.total_classes_offered) : null,
         prerequisite_course_id: formData.prerequisite_course_id || null,
+        status: courseStatus,
       });
+      
+      const courseId = response.data.id;
+      
+      // Handle mentor assignments based on course status
+      if (selectedMentors.length > 0) {
+        const mentorAssignments = selectedMentors
+          .filter(mentor => mentor.mentor_id && mentor.hours_taught !== undefined && mentor.amount_paid !== undefined)
+          .map(mentor => ({
+            mentor_id: mentor.mentor_id,
+            hours_taught: parseFloat(mentor.hours_taught) || 0,
+            amount_paid: parseFloat(mentor.amount_paid) || 0,
+          }));
+        
+        if (mentorAssignments.length > 0) {
+          if (createAsDraft) {
+            // Save mentors to draft for planning courses
+            try {
+              await coursesAPI.saveDraft(courseId, {
+                mentor_assignments: mentorAssignments,
+              });
+            } catch (error) {
+              console.error('Error saving mentor assignments to draft:', error);
+              // Continue even if draft save fails
+            }
+          } else {
+            // Assign mentors directly for ongoing courses
+            for (const assignment of mentorAssignments) {
+              try {
+                await coursesAPI.assignMentor(courseId, assignment);
+              } catch (error) {
+                console.error('Error assigning mentor:', error);
+                // Continue with other mentors even if one fails
+              }
+            }
+          }
+        }
+      }
+      
       handleClose();
       fetchCourses();
+      setMessage({ 
+        type: 'success', 
+        text: `Course created successfully as ${createAsDraft ? 'Planning (Draft)' : 'Ongoing'}` 
+      });
     } catch (error) {
       console.error('Error creating course:', error);
-      alert(error.response?.data?.detail || 'Error creating course');
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error creating course' });
     }
   };
 
-  const handleArchive = async (id) => {
-    if (window.confirm('Are you sure you want to archive this course?')) {
-      try {
-        await coursesAPI.archive(id);
-        fetchCourses();
+  const handleAssignInternalMentor = async (assignment) => {
+    // Fetch mentor details to get name for display
+    try {
+      const mentorResponse = await mentorsAPI.getById(assignment.mentor_id);
+      const mentor = mentorResponse.data;
+      const mentorName = mentor.student 
+        ? `${mentor.student.name} (${mentor.student.employee_id})` 
+        : mentor.name;
+      
+      setSelectedMentors([...selectedMentors, {
+        ...assignment,
+        mentor_name: mentorName,
+        is_internal: true,
+      }]);
+      setMessage({ type: 'success', text: 'Internal mentor added successfully' });
       } catch (error) {
-        console.error('Error archiving course:', error);
-      }
+      console.error('Error fetching mentor details:', error);
+      // Still add the mentor even if we can't fetch details
+      setSelectedMentors([...selectedMentors, {
+        ...assignment,
+        mentor_name: 'Internal Mentor',
+        is_internal: true,
+      }]);
+      setMessage({ type: 'success', text: 'Internal mentor added successfully' });
     }
+  };
+
+  const handleAddExternalMentor = async (assignment) => {
+    // Fetch mentor details to get name for display
+    try {
+      const mentorResponse = await mentorsAPI.getById(assignment.mentor_id);
+      const mentor = mentorResponse.data;
+      const mentorName = mentor.name || 'External Mentor';
+      
+      setSelectedMentors([...selectedMentors, {
+        ...assignment,
+        mentor_name: mentorName,
+        is_internal: false,
+      }]);
+      setMessage({ type: 'success', text: 'External mentor added successfully' });
+    } catch (error) {
+      console.error('Error fetching mentor details:', error);
+      // Still add the mentor even if we can't fetch details
+      setSelectedMentors([...selectedMentors, {
+        ...assignment,
+        mentor_name: 'External Mentor',
+        is_internal: false,
+      }]);
+      setMessage({ type: 'success', text: 'External mentor added successfully' });
+    }
+  };
+
+  const handleRemoveMentor = (index) => {
+    setSelectedMentors(selectedMentors.filter((_, i) => i !== index));
   };
 
   const handleDelete = async (id) => {
-    const confirmMessage = showArchived 
-      ? 'Are you sure you want to PERMANENTLY DELETE this archived course? This will completely remove it from the database and cannot be undone. All course data will be lost forever.'
-      : 'Are you sure you want to PERMANENTLY DELETE this course? This will completely remove it from the database and cannot be undone. All course data will be lost forever.';
+    const confirmMessage = 'Are you sure you want to PERMANENTLY DELETE this course? This will completely remove it from the database and cannot be undone. All course data will be lost forever.';
     
     if (window.confirm(confirmMessage)) {
       try {
@@ -236,13 +361,9 @@ function Courses() {
   const handleGenerateReport = async (courseId) => {
     try {
       const response = await coursesAPI.generateReport(courseId);
-      
-      // Create blob from response
       const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
-      
-      // Get filename from Content-Disposition header or use default
       const contentDisposition = response.headers['content-disposition'];
       let filename = `course_report_${courseId}.xlsx`;
       if (contentDisposition) {
@@ -251,8 +372,6 @@ function Courses() {
           filename = filenameMatch[1];
         }
       }
-      
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -261,495 +380,29 @@ function Courses() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
       setMessage({ type: 'success', text: 'Report generated and downloaded successfully' });
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Error generating report' });
     }
   };
 
-  const handleToggleExpand = async (courseId) => {
-    if (expandedCourse === courseId) {
-      setExpandedCourse(null);
-    } else {
-      setExpandedCourse(courseId);
-      if (!courseEnrollments[courseId]) {
-        setLoadingEnrollments({ ...loadingEnrollments, [courseId]: true });
-        try {
-          const response = await enrollmentsAPI.getAll({ course_id: courseId });
-          setCourseEnrollments({ ...courseEnrollments, [courseId]: response.data });
-        } catch (error) {
-          console.error('Error fetching enrollments:', error);
-        } finally {
-          setLoadingEnrollments({ ...loadingEnrollments, [courseId]: false });
-        }
-      }
-    }
+  const handleViewDetails = (courseId) => {
+    navigate(`/courses/${courseId}`);
   };
 
-  const handleWithdraw = (enrollment) => {
-    setSelectedEnrollment(enrollment);
-    setWithdrawalReason('');
-    setWithdrawDialogOpen(true);
-  };
-
-  const handleWithdrawConfirm = async () => {
-    if (!withdrawalReason.trim()) {
-      setMessage({ type: 'error', text: 'Please provide a reason for withdrawal' });
+  const handleApproveCourse = async (courseId) => {
+    // Simple confirmation popup
+    if (!window.confirm('Are you sure you want to approve this course? This will move it from Planning to Ongoing Courses and make all draft changes permanent.')) {
       return;
     }
 
     try {
-      await enrollmentsAPI.withdraw(selectedEnrollment.id, withdrawalReason, 'Admin');
-      setMessage({ type: 'success', text: 'Student withdrawn successfully' });
-      setWithdrawDialogOpen(false);
-      setSelectedEnrollment(null);
-      setWithdrawalReason('');
-      
-      // Refresh enrollments for the course
-      if (expandedCourse) {
-        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
-        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
-      }
-      
-      // Refresh courses to update seat counts
+      // Use "Admin" as default approved_by value
+      await coursesAPI.approveCourse(courseId, 'Admin');
+      setMessage({ type: 'success', text: 'Course approved and moved to ongoing courses!' });
       fetchCourses();
     } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error withdrawing student' });
-    }
-  };
-
-  const handleWithdrawCancel = () => {
-    setWithdrawDialogOpen(false);
-    setSelectedEnrollment(null);
-    setWithdrawalReason('');
-  };
-
-  const handleEditAttendance = async () => {
-    if (!selectedEnrollmentForEdit) return;
-    
-    const classesAttended = parseInt(editClassesAttended);
-    const score = parseFloat(editScore);
-    
-    if (isNaN(classesAttended) || classesAttended < 0) {
-      setMessage({ type: 'error', text: 'Please enter a valid number of classes attended' });
-      return;
-    }
-    
-    if (isNaN(score) || score < 0 || score > 100) {
-      setMessage({ type: 'error', text: 'Please enter a valid score between 0 and 100' });
-      return;
-    }
-    
-    setEditAttendanceLoading(true);
-    try {
-      await completionsAPI.updateEnrollmentAttendance(
-        selectedEnrollmentForEdit.id,
-        classesAttended,
-        score
-      );
-      
-      setMessage({ type: 'success', text: 'Attendance and score updated successfully' });
-      setEditAttendanceDialogOpen(false);
-      setSelectedEnrollmentForEdit(null);
-      setEditClassesAttended('');
-      setEditScore('');
-      
-      // Refresh enrollments for the course
-      if (expandedCourse) {
-        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
-        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error updating attendance and score' });
-    } finally {
-      setEditAttendanceLoading(false);
-    }
-  };
-
-  const handleCloseEditAttendance = () => {
-    setEditAttendanceDialogOpen(false);
-    setSelectedEnrollmentForEdit(null);
-    setEditClassesAttended('');
-    setEditScore('');
-  };
-
-  const handleApprove = async (id) => {
-    // Save scroll position before approval
-    const scrollPosition = window.scrollY || window.pageYOffset;
-    
-    try {
-      await enrollmentsAPI.approve({ enrollment_id: id, approved: true }, 'Admin');
-      setMessage({ type: 'success', text: 'Enrollment approved successfully' });
-      
-      // Refresh enrollments for the course
-      if (expandedCourse) {
-        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
-        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
-      }
-      
-      // Refresh courses to update seat counts
-      await fetchCourses();
-      
-      // Restore scroll position after DOM updates
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollPosition);
-        });
-      });
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error approving enrollment' });
-      // Restore scroll position even on error
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollPosition);
-        });
-      });
-    }
-  };
-
-  const handleReject = async (id) => {
-    // Save scroll position before rejection
-    const scrollPosition = window.scrollY || window.pageYOffset;
-    
-    try {
-      await enrollmentsAPI.approve(
-        { enrollment_id: id, approved: false, rejection_reason: 'Rejected by admin' },
-        'Admin'
-      );
-      setMessage({ type: 'success', text: 'Enrollment rejected' });
-      
-      // Refresh enrollments for the course
-      if (expandedCourse) {
-        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
-        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
-      }
-      
-      await fetchCourses();
-      
-      // Restore scroll position after DOM updates
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollPosition);
-        });
-      });
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error rejecting enrollment' });
-      // Restore scroll position even on error
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollPosition);
-        });
-      });
-    }
-  };
-
-  const handleReapprove = async (enrollment) => {
-    // Save scroll position before reapproval
-    const scrollPosition = window.scrollY || window.pageYOffset;
-    
-    try {
-      await enrollmentsAPI.reapprove(enrollment.id, 'Admin');
-      setMessage({ type: 'success', text: 'Student reapproved successfully' });
-      
-      // Refresh enrollments for the course
-      if (expandedCourse) {
-        const response = await enrollmentsAPI.getAll({ course_id: expandedCourse });
-        setCourseEnrollments({ ...courseEnrollments, [expandedCourse]: response.data });
-      }
-      
-      // Refresh courses to update seat counts
-      await fetchCourses();
-      
-      // Restore scroll position after DOM updates
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollPosition);
-        });
-      });
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error reapproving student' });
-      // Restore scroll position even on error
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollPosition);
-        });
-      });
-    }
-  };
-
-  const handleViewUserDetails = (enrollment) => {
-    setSelectedUserEnrollment(enrollment);
-    setUserDetailsOpen(true);
-  };
-
-  const handleViewCourseDetails = (enrollment) => {
-    setSelectedCourseEnrollment(enrollment);
-    setCourseDetailsOpen(true);
-  };
-
-  const handleOpenImport = (course) => {
-    setSelectedCourseForImport(course);
-    setImportFile(null);
-    setImportResults(null);
-    setImportDialogOpen(true);
-  };
-
-  const handleCloseImport = () => {
-    setImportDialogOpen(false);
-    setSelectedCourseForImport(null);
-    setImportFile(null);
-    setImportResults(null);
-  };
-
-  const handleImportFileChange = (event) => {
-    setImportFile(event.target.files[0]);
-    setImportResults(null);
-  };
-
-  const handleImportExcel = async () => {
-    if (!importFile || !selectedCourseForImport) {
-      setMessage({ type: 'error', text: 'Please select a file' });
-      return;
-    }
-
-    setImportLoading(true);
-    setMessage(null);
-    try {
-      // Only handle enrollment registrations
-      const response = await importsAPI.uploadExcel(importFile, selectedCourseForImport.id);
-      setImportResults(response.data.results);
-      setMessage({ type: 'success', text: response.data.message });
-      setImportFile(null);
-      fetchCourses();
-      // Refresh enrollments if the course is expanded
-      if (expandedCourse === selectedCourseForImport.id) {
-        handleToggleExpand(selectedCourseForImport.id);
-        setTimeout(() => handleToggleExpand(selectedCourseForImport.id), 100);
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  const handleImportCSV = async () => {
-    if (!importFile || !selectedCourseForImport) {
-      setMessage({ type: 'error', text: 'Please select a file' });
-      return;
-    }
-
-    setImportLoading(true);
-    setMessage(null);
-    try {
-      // Only handle enrollment registrations
-      const response = await importsAPI.uploadCSV(importFile, selectedCourseForImport.id);
-      setImportResults(response.data.results);
-      setMessage({ type: 'success', text: response.data.message });
-      setImportFile(null);
-      fetchCourses();
-      // Refresh enrollments if the course is expanded
-      if (expandedCourse === selectedCourseForImport.id) {
-        handleToggleExpand(selectedCourseForImport.id);
-        setTimeout(() => handleToggleExpand(selectedCourseForImport.id), 100);
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  const handleViewCourseInfo = (course) => {
-    setSelectedCourseForDetails(course);
-    setEditCourseData({
-      name: course.name || '',
-      batch_code: course.batch_code || '',
-      description: course.description || '',
-      start_date: course.start_date ? new Date(course.start_date) : null,
-      end_date: course.end_date ? new Date(course.end_date) : null,
-      seat_limit: course.seat_limit || 0,
-      total_classes_offered: course.total_classes_offered || '',
-      prerequisite_course_id: course.prerequisite_course_id || null,
-    });
-    setIsEditingCourse(false);
-    setCourseDetailsCardOpen(true);
-  };
-
-  const handleSaveCourseEdit = async () => {
-    if (!selectedCourseForDetails) return;
-    
-    setEditCourseLoading(true);
-    try {
-      const updateData = {
-        name: editCourseData.name || '',
-        batch_code: editCourseData.batch_code || '',
-        description: editCourseData.description || null,
-        start_date: editCourseData.start_date ? editCourseData.start_date.toISOString().split('T')[0] : null,
-        end_date: editCourseData.end_date ? editCourseData.end_date.toISOString().split('T')[0] : null,
-        seat_limit: parseInt(editCourseData.seat_limit) || 0,
-        total_classes_offered: editCourseData.total_classes_offered ? parseInt(editCourseData.total_classes_offered) : null,
-        prerequisite_course_id: editCourseData.prerequisite_course_id || null,
-      };
-      
-      await coursesAPI.update(selectedCourseForDetails.id, updateData);
-      setMessage({ type: 'success', text: 'Course updated successfully' });
-      setIsEditingCourse(false);
-      fetchCourses();
-      // Update the selected course details
-      const updatedCourse = { ...selectedCourseForDetails, ...updateData };
-      setSelectedCourseForDetails(updatedCourse);
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error updating course' });
-    } finally {
-      setEditCourseLoading(false);
-    }
-  };
-
-  const handleOpenManualEnroll = async (course) => {
-    setSelectedCourseForEnroll(course);
-    setSelectedStudentId('');
-    setLoadingStudents(true);
-    try {
-      const response = await studentsAPI.getAll({ limit: 1000 });
-      setStudents(response.data);
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      setMessage({ type: 'error', text: 'Error fetching students' });
-    } finally {
-      setLoadingStudents(false);
-    }
-    setManualEnrollDialogOpen(true);
-  };
-
-  const handleCloseManualEnroll = () => {
-    setManualEnrollDialogOpen(false);
-    setSelectedCourseForEnroll(null);
-    setSelectedStudentId('');
-  };
-
-  const handleOpenAttendanceScores = (course) => {
-    setSelectedCourseForAttendance(course);
-    setAttendanceScoresFile(null);
-    setAttendanceScoresResults(null);
-    setAttendanceScoresDialogOpen(true);
-  };
-
-  const handleCloseAttendanceScores = () => {
-    setAttendanceScoresDialogOpen(false);
-    setSelectedCourseForAttendance(null);
-    setAttendanceScoresFile(null);
-    setAttendanceScoresResults(null);
-  };
-
-  const handleAttendanceScoresFileChange = (event) => {
-    setAttendanceScoresFile(event.target.files[0]);
-    setAttendanceScoresResults(null);
-  };
-
-  const handleUploadAttendanceExcel = async () => {
-    if (!attendanceScoresFile || !selectedCourseForAttendance) {
-      setMessage({ type: 'error', text: 'Please select a file' });
-      return;
-    }
-
-    // Validate file type
-    const fileName = attendanceScoresFile.name.toLowerCase();
-    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
-      setMessage({ type: 'error', text: 'Please select an Excel file (.xlsx or .xls)' });
-      return;
-    }
-
-    setAttendanceScoresLoading(true);
-    setMessage(null);
-    try {
-      // Upload attendance and scores (single file with both)
-      const response = await completionsAPI.uploadAttendance(attendanceScoresFile, selectedCourseForAttendance.id);
-      setAttendanceScoresResults(response.data);
-      setMessage({ type: 'success', text: 'Attendance and scores uploaded successfully' });
-      setAttendanceScoresFile(null);
-      fetchCourses();
-      // Refresh enrollments if the course is expanded
-      if (expandedCourse === selectedCourseForAttendance.id) {
-        handleToggleExpand(selectedCourseForAttendance.id);
-        setTimeout(() => handleToggleExpand(selectedCourseForAttendance.id), 100);
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
-    } finally {
-      setAttendanceScoresLoading(false);
-    }
-  };
-
-  const handleUploadAttendanceCSV = async () => {
-    if (!attendanceScoresFile || !selectedCourseForAttendance) {
-      setMessage({ type: 'error', text: 'Please select a file' });
-      return;
-    }
-
-    // Validate file type
-    const fileName = attendanceScoresFile.name.toLowerCase();
-    if (!fileName.endsWith('.csv')) {
-      setMessage({ type: 'error', text: 'Please select a CSV file (.csv)' });
-      return;
-    }
-
-    setAttendanceScoresLoading(true);
-    setMessage(null);
-    try {
-      // Upload attendance and scores (single file with both)
-      const response = await completionsAPI.uploadAttendance(attendanceScoresFile, selectedCourseForAttendance.id);
-      setAttendanceScoresResults(response.data);
-      setMessage({ type: 'success', text: 'Attendance and scores uploaded successfully' });
-      setAttendanceScoresFile(null);
-      fetchCourses();
-      // Refresh enrollments if the course is expanded
-      if (expandedCourse === selectedCourseForAttendance.id) {
-        handleToggleExpand(selectedCourseForAttendance.id);
-        setTimeout(() => handleToggleExpand(selectedCourseForAttendance.id), 100);
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error uploading file' });
-    } finally {
-      setAttendanceScoresLoading(false);
-    }
-  };
-
-  const handleManualEnrollConfirm = async () => {
-    if (!selectedStudentId || !selectedCourseForEnroll) {
-      setMessage({ type: 'error', text: 'Please select a student' });
-      return;
-    }
-
-    try {
-      await enrollmentsAPI.create({
-        student_id: parseInt(selectedStudentId),
-        course_id: selectedCourseForEnroll.id,
-      });
-      setMessage({ type: 'success', text: 'Student enrolled and automatically approved successfully' });
-      setManualEnrollDialogOpen(false);
-      setSelectedStudentId('');
-      const courseId = selectedCourseForEnroll.id;
-      setSelectedCourseForEnroll(null);
-      
-      // Refresh courses to update seat counts
-      await fetchCourses();
-      
-      // Refresh enrollments for this course if it's expanded or if enrollments were previously loaded
-      if (expandedCourse === courseId || courseEnrollments[courseId]) {
-        setLoadingEnrollments({ ...loadingEnrollments, [courseId]: true });
-        try {
-          const response = await enrollmentsAPI.getAll({ course_id: courseId });
-          setCourseEnrollments({ ...courseEnrollments, [courseId]: response.data });
-        } catch (error) {
-          console.error('Error fetching enrollments:', error);
-        } finally {
-          setLoadingEnrollments({ ...loadingEnrollments, [courseId]: false });
-        }
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error enrolling student' });
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error approving course' });
     }
   };
 
@@ -768,30 +421,14 @@ function Courses() {
               backgroundClip: 'text',
             }}
           >
-            {showArchived ? 'Archived Courses' : 'Courses'}
+            {status === 'ongoing' ? 'Ongoing Courses' : status === 'planning' ? 'Planning Courses' : 'Completed Courses'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {showArchived ? 'View historical course data and enrollments' : 'Manage active courses and enrollments'}
+            {status === 'ongoing' ? 'Courses currently in progress' : status === 'planning' ? 'Courses scheduled for the future' : 'Courses that have been completed'}
           </Typography>
         </Box>
         <Box display="flex" gap={2}>
-          <Button
-            variant={showArchived ? "contained" : "outlined"}
-            startIcon={<History />}
-            onClick={() => {
-              setShowArchived(!showArchived);
-              setExpandedCourse(null);
-              setCourseEnrollments({});
-            }}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-            }}
-          >
-            {showArchived ? "Show Active" : "Show Archived"}
-          </Button>
-          {!showArchived && (
+          {status === 'planning' && (
             <Button 
               variant="contained" 
               startIcon={<Add />} 
@@ -844,7 +481,7 @@ function Courses() {
             <CardContent>
               <Box display="flex" gap={2} flexWrap="wrap">
                 <Autocomplete
-                  options={courses}
+                  options={allCourses}
                   getOptionLabel={(option) => option ? `${option.name} (${option.batch_code})` : ''}
                   value={selectedSearchCourse}
                   onChange={(event, newValue) => {
@@ -932,23 +569,6 @@ function Courses() {
                     views={['year', 'month', 'day']}
                   />
                 </LocalizationProvider>
-                <TextField
-                  select
-                  label="SBU"
-                  value={selectedSBU}
-                  onChange={(e) => setSelectedSBU(e.target.value)}
-                  size="small"
-                  sx={{ minWidth: 150 }}
-                >
-                  <MenuItem value="">All SBUs</MenuItem>
-                  <MenuItem value="IT">IT</MenuItem>
-                  <MenuItem value="HR">HR</MenuItem>
-                  <MenuItem value="Finance">Finance</MenuItem>
-                  <MenuItem value="Operations">Operations</MenuItem>
-                  <MenuItem value="Sales">Sales</MenuItem>
-                  <MenuItem value="Marketing">Marketing</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
-                </TextField>
                 {(startDateFilter || endDateFilter || searchQuery || selectedSBU) && (
                   <Button
                     variant="outlined"
@@ -981,7 +601,6 @@ function Courses() {
               <Table>
             <TableHead>
               <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                <TableCell width={50}></TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Batch Code</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Start Date</TableCell>
@@ -992,24 +611,27 @@ function Courses() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredCourses.map((course) => (
-                <React.Fragment key={course.id}>
+                  {filteredCourses.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          No courses found
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredCourses.map((course) => (
                   <TableRow
+                        key={course.id}
                     sx={{
                       '&:hover': {
                         backgroundColor: alpha(theme.palette.primary.main, 0.03),
+                            cursor: 'pointer',
                       },
                       transition: 'background-color 0.2s',
                     }}
-                  >
-                    <TableCell>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleToggleExpand(course.id)}
+                        onClick={() => handleViewDetails(course.id)}
                       >
-                        {expandedCourse === course.id ? <ExpandLess /> : <ExpandMore />}
-                      </IconButton>
-                    </TableCell>
                     <TableCell>{course.name}</TableCell>
                     <TableCell>{course.batch_code}</TableCell>
                     <TableCell>{course.start_date}</TableCell>
@@ -1022,887 +644,41 @@ function Courses() {
                         size="small"
                       />
                     </TableCell>
-                    <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                       <Box display="flex" gap={1}>
-                        <IconButton
-                          color="primary"
-                          onClick={() => handleViewCourseInfo(course)}
-                          title="View Course Details"
-                        >
-                          <Info />
-                        </IconButton>
                         <IconButton
                           color="primary"
                           onClick={() => handleGenerateReport(course.id)}
                           title="Generate Report"
+                                                  size="small"
                         >
-                          <Description />
-                        </IconButton>
-                        {!showArchived && (
-                          <>
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleOpenManualEnroll(course)}
-                              title="Add Student"
-                            >
-                              <PersonAdd />
-                            </IconButton>
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleOpenAttendanceScores(course)}
-                              title="Upload Attendance & Scores"
-                            >
-                              <EventAvailable />
-                            </IconButton>
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleOpenImport(course)}
-                              title="Upload Registered Students"
-                            >
-                              <UploadFile />
-                            </IconButton>
-                            <IconButton
-                              color="secondary"
-                              onClick={() => handleArchive(course.id)}
-                              title="Archive Course"
-                            >
-                              <Archive />
-                            </IconButton>
-                            <IconButton
-                              color="error"
+                              <Download />
+                                                  </IconButton>
+                        {status === 'planning' && (course.status === 'draft' || String(course.status).toLowerCase() === 'draft') && (
+                                                  <IconButton
+                                                    color="success"
+                              onClick={() => handleApproveCourse(course.id)}
+                              title="Approve Course"
+                                                    size="small"
+                                                  >
+                              <CheckCircle />
+                                                  </IconButton>
+                        )}
+                        {status !== 'completed' && (
+                                                <IconButton
+                                                    color="error"
                               onClick={() => handleDelete(course.id)}
                               title="Delete Course"
+                                                    size="small"
                             >
                               <Delete />
-                            </IconButton>
-                          </>
-                        )}
-                        {showArchived && (
-                          <>
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDelete(course.id)}
-                              title="Permanently Delete Course"
-                            >
-                              <Delete />
-                            </IconButton>
-                            <Chip label="Archived" color="default" size="small" />
-                          </>
-                        )}
-                      </Box>
+                                                  </IconButton>
+                                                )}
+                                </Box>
                     </TableCell>
                   </TableRow>
-                  <TableRow>
-                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
-                      <Collapse in={expandedCourse === course.id} timeout="auto" unmountOnExit>
-                        <Box sx={{ margin: 2 }}>
-                          {loadingEnrollments[course.id] ? (
-                            <Box display="flex" justifyContent="center" p={2}>
-                              <CircularProgress size={24} />
-                            </Box>
-                          ) : courseEnrollments[course.id] && courseEnrollments[course.id].length > 0 ? (
-                            <Box display="flex" flexDirection="column" gap={3}>
-                              {/* Approved/Enrolled Students Section */}
-                              {courseEnrollments[course.id].filter(e => {
-                                if (e.approval_status !== 'Approved') return false;
-                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                return true;
-                              }).length > 0 && (
-                                <Box>
-                                  <Typography 
-                                    variant="h6" 
-                                    gutterBottom
-                                    sx={{ 
-                                      mb: 2,
-                                      color: theme.palette.primary.main,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Enrolled Students ({courseEnrollments[course.id].filter(e => {
-                                      if (e.approval_status !== 'Approved') return false;
-                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                      return true;
-                                    }).length})
-                                  </Typography>
-                                  <TableContainer 
-                                    component={Paper} 
-                                    variant="outlined"
-                                    sx={{
-                                      borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.primary.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.primary.main, 0.02),
-                                    }}
-                                  >
-                                    <Table size="small">
-                                      <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.1) }}>
-                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Completion Status</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Score</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Attendance</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                                        </TableRow>
-                                      </TableHead>
-                                      <TableBody>
-                                        {courseEnrollments[course.id]
-                                          .filter(enrollment => {
-                                            if (enrollment.approval_status !== 'Approved') return false;
-                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
-                                            return true;
-                                          })
-                                          .sort((a, b) => {
-                                            // Extract numeric part from employee ID for proper sorting
-                                            const empIdA = a.student_employee_id || '';
-                                            const empIdB = b.student_employee_id || '';
-                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
-                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
-                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
-                                            if (numA !== numB) {
-                                              return numA - numB;
-                                            }
-                                            // If numbers are equal or not found, sort alphabetically
-                                            return empIdA.localeCompare(empIdB);
-                                          })
-                                          .map((enrollment) => (
-                                            <TableRow key={enrollment.id} hover>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_employee_id || '-'}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_name}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>{enrollment.student_email}</TableCell>
-                                              <TableCell>
-                                                <Chip label={enrollment.student_sbu} size="small" />
-                                              </TableCell>
-                                              <TableCell>
-                                                <Chip
-                                                  label={enrollment.completion_status}
-                                                  color={
-                                                    enrollment.completion_status === 'Completed' ? 'success' :
-                                                    enrollment.completion_status === 'Failed' ? 'error' :
-                                                    enrollment.completion_status === 'In Progress' ? 'warning' : 'default'
-                                                  }
-                                                  size="small"
-                                                />
-                                              </TableCell>
-                                              <TableCell>{enrollment.score || '-'}</TableCell>
-                                              <TableCell>
-                                                {enrollment.attendance_percentage !== null && enrollment.attendance_percentage !== undefined
-                                                  ? `${enrollment.attendance_percentage.toFixed(1)}%`
-                                                  : enrollment.attendance_status || '-'}
-                                              </TableCell>
-                                              <TableCell>
-                                                {(() => {
-                                                  const rate = enrollment.overall_completion_rate || 0;
-                                                  let color = 'error.main';
-                                                  if (rate >= 75) {
-                                                    color = 'success.main';
-                                                  } else if (rate >= 60) {
-                                                    color = 'warning.main';
-                                                  }
-                                                  return (
-                                                    <Typography
-                                                      sx={{
-                                                        color: color,
-                                                        fontWeight: 600,
-                                                      }}
-                                                    >
-                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
-                                                    </Typography>
-                                                  );
-                                                })()}
-                                              </TableCell>
-                                              <TableCell>
-                                                <Box display="flex" gap={1}>
-                                                  <IconButton
-                                                    size="small"
-                                                    color="primary"
-                                                    onClick={() => {
-                                                      setSelectedEnrollmentForEdit(enrollment);
-                                                      setEditClassesAttended(enrollment.present != null ? String(enrollment.present) : '');
-                                                      setEditScore(enrollment.score != null ? String(enrollment.score) : '');
-                                                      setEditAttendanceDialogOpen(true);
-                                                    }}
-                                                    title="Edit Attendance & Score"
-                                                  >
-                                                    <Edit fontSize="small" />
-                                                  </IconButton>
-                                                  <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => handleWithdraw(enrollment)}
-                                                    title="Withdraw Student"
-                                                  >
-                                                    <PersonRemove fontSize="small" />
-                                                  </IconButton>
-                                                </Box>
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                      </TableBody>
-                                    </Table>
-                                  </TableContainer>
-                                </Box>
-                              )}
-
-                              {/* Eligible Enrollments (Pending) Section */}
-                              {courseEnrollments[course.id].filter(e => {
-                                if (e.eligibility_status !== 'Eligible' || e.approval_status !== 'Pending') return false;
-                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                return true;
-                              }).length > 0 && (
-                                <Box>
-                                  <Typography 
-                                    variant="h6" 
-                                    gutterBottom
-                                    sx={{ 
-                                      mb: 2,
-                                      color: theme.palette.success.main,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Eligible Enrollments (Pending) ({courseEnrollments[course.id].filter(e => {
-                                      if (e.eligibility_status !== 'Eligible' || e.approval_status !== 'Pending') return false;
-                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                      return true;
-                                    }).length})
-                                  </Typography>
-                                  <TableContainer 
-                                    component={Paper} 
-                                    variant="outlined"
-                                    sx={{
-                                      borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.success.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.success.main, 0.02),
-                                    }}
-                                  >
-                                    <Table size="small">
-                                      <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.success.main, 0.1) }}>
-                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                                        </TableRow>
-                                      </TableHead>
-                                      <TableBody>
-                                        {courseEnrollments[course.id]
-                                          .filter(enrollment => {
-                                            if (enrollment.eligibility_status !== 'Eligible' || enrollment.approval_status !== 'Pending') return false;
-                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
-                                            return true;
-                                          })
-                                          .sort((a, b) => {
-                                            // Extract numeric part from employee ID for proper sorting
-                                            const empIdA = a.student_employee_id || '';
-                                            const empIdB = b.student_employee_id || '';
-                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
-                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
-                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
-                                            if (numA !== numB) {
-                                              return numA - numB;
-                                            }
-                                            // If numbers are equal or not found, sort alphabetically
-                                            return empIdA.localeCompare(empIdB);
-                                          })
-                                          .map((enrollment) => (
-                                            <TableRow key={enrollment.id} hover>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_employee_id || '-'}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_name}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>{enrollment.student_email}</TableCell>
-                                              <TableCell>
-                                                <Chip label={enrollment.student_sbu} size="small" />
-                                              </TableCell>
-                                              <TableCell>
-                                                {(() => {
-                                                  const rate = enrollment.overall_completion_rate || 0;
-                                                  let color = 'error.main';
-                                                  if (rate >= 75) {
-                                                    color = 'success.main';
-                                                  } else if (rate >= 60) {
-                                                    color = 'warning.main';
-                                                  }
-                                                  return (
-                                                    <Typography
-                                                      sx={{
-                                                        color: color,
-                                                        fontWeight: 600,
-                                                      }}
-                                                    >
-                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
-                                                    </Typography>
-                                                  );
-                                                })()}
-                                              </TableCell>
-                                              <TableCell>
-                                                <Box display="flex" gap={1}>
-                                                  <IconButton
-                                                    size="small"
-                                                    color="success"
-                                                    onClick={() => handleApprove(enrollment.id)}
-                                                    title="Approve"
-                                                  >
-                                                    <CheckCircle fontSize="small" />
-                                                  </IconButton>
-                                                  <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => handleReject(enrollment.id)}
-                                                    title="Reject"
-                                                  >
-                                                    <Cancel fontSize="small" />
-                                                  </IconButton>
-                                                </Box>
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                      </TableBody>
-                                    </Table>
-                                  </TableContainer>
-                                </Box>
-                              )}
-
-                              {/* Withdrawn Students Section */}
-                              {courseEnrollments[course.id].filter(e => {
-                                if (e.approval_status !== 'Withdrawn') return false;
-                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                return true;
-                              }).length > 0 && (
-                                <Box>
-                                  <Typography 
-                                    variant="h6" 
-                                    gutterBottom
-                                    sx={{ 
-                                      mb: 2,
-                                      color: theme.palette.warning.main,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Withdrawn Students ({courseEnrollments[course.id].filter(e => {
-                                      if (e.approval_status !== 'Withdrawn') return false;
-                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                      return true;
-                                    }).length})
-                                  </Typography>
-                                  <TableContainer 
-                                    component={Paper} 
-                                    variant="outlined"
-                                    sx={{
-                                      borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.warning.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.warning.main, 0.02),
-                                    }}
-                                  >
-                                    <Table size="small">
-                                      <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.warning.main, 0.1) }}>
-                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Withdrawal Reason</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Add</TableCell>
-                                        </TableRow>
-                                      </TableHead>
-                                      <TableBody>
-                                        {courseEnrollments[course.id]
-                                          .filter(enrollment => {
-                                            if (enrollment.approval_status !== 'Withdrawn') return false;
-                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
-                                            return true;
-                                          })
-                                          .sort((a, b) => {
-                                            // Extract numeric part from employee ID for proper sorting
-                                            const empIdA = a.student_employee_id || '';
-                                            const empIdB = b.student_employee_id || '';
-                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
-                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
-                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
-                                            if (numA !== numB) {
-                                              return numA - numB;
-                                            }
-                                            // If numbers are equal or not found, sort alphabetically
-                                            return empIdA.localeCompare(empIdB);
-                                          })
-                                          .map((enrollment) => (
-                                            <TableRow key={enrollment.id} hover>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_employee_id || '-'}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_name}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>{enrollment.student_email}</TableCell>
-                                              <TableCell>
-                                                <Chip label={enrollment.student_sbu} size="small" />
-                                              </TableCell>
-                                              <TableCell>
-                                                {enrollment.rejection_reason ? (
-                                                  <Typography variant="body2" color="error">
-                                                    {enrollment.rejection_reason}
-                                                  </Typography>
-                                                ) : (
-                                                  <Typography variant="body2" color="text.secondary">
-                                                    No reason provided
-                                                  </Typography>
-                                                )}
-                                              </TableCell>
-                                              <TableCell>
-                                                {(() => {
-                                                  const rate = enrollment.overall_completion_rate || 0;
-                                                  let color = 'error.main';
-                                                  if (rate >= 75) {
-                                                    color = 'success.main';
-                                                  } else if (rate >= 60) {
-                                                    color = 'warning.main';
-                                                  }
-                                                  return (
-                                                    <Typography
-                                                      sx={{
-                                                        color: color,
-                                                        fontWeight: 600,
-                                                      }}
-                                                    >
-                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
-                                                    </Typography>
-                                                  );
-                                                })()}
-                                              </TableCell>
-                                              <TableCell>
-                                                <IconButton
-                                                  size="small"
-                                                  color="success"
-                                                  onClick={() => handleReapprove(enrollment)}
-                                                  title="Reapprove Student"
-                                                >
-                                                  <PersonAdd fontSize="small" />
-                                                </IconButton>
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                      </TableBody>
-                                    </Table>
-                                  </TableContainer>
-                                </Box>
-                              )}
-
-                              {/* Rejected Enrollments Section */}
-                              {courseEnrollments[course.id].filter(e => {
-                                if (e.approval_status !== 'Rejected') return false;
-                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                return true;
-                              }).length > 0 && (
-                                <Box>
-                                  <Typography 
-                                    variant="h6" 
-                                    gutterBottom
-                                    sx={{ 
-                                      mb: 2,
-                                      color: theme.palette.error.main,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Rejected Enrollments ({courseEnrollments[course.id].filter(e => {
-                                      if (e.approval_status !== 'Rejected') return false;
-                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                      return true;
-                                    }).length})
-                                  </Typography>
-                                  <TableContainer 
-                                    component={Paper} 
-                                    variant="outlined"
-                                    sx={{
-                                      borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.error.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.error.main, 0.02),
-                                    }}
-                                  >
-                                    <Table size="small">
-                                      <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.error.main, 0.1) }}>
-                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Rejection Reason</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Add</TableCell>
-                                        </TableRow>
-                                      </TableHead>
-                                      <TableBody>
-                                        {courseEnrollments[course.id]
-                                          .filter(enrollment => {
-                                            if (enrollment.approval_status !== 'Rejected') return false;
-                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
-                                            return true;
-                                          })
-                                          .sort((a, b) => {
-                                            // Extract numeric part from employee ID for proper sorting
-                                            const empIdA = a.student_employee_id || '';
-                                            const empIdB = b.student_employee_id || '';
-                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
-                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
-                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
-                                            if (numA !== numB) {
-                                              return numA - numB;
-                                            }
-                                            // If numbers are equal or not found, sort alphabetically
-                                            return empIdA.localeCompare(empIdB);
-                                          })
-                                          .map((enrollment) => (
-                                            <TableRow key={enrollment.id} hover>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_employee_id || '-'}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_name}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>{enrollment.student_email}</TableCell>
-                                              <TableCell>
-                                                <Chip label={enrollment.student_sbu} size="small" />
-                                              </TableCell>
-                                              <TableCell>
-                                                {enrollment.rejection_reason ? (
-                                                  <Typography variant="body2" color="error">
-                                                    {enrollment.rejection_reason}
-                                                  </Typography>
-                                                ) : (
-                                                  <Typography variant="body2" color="text.secondary">
-                                                    No reason provided
-                                                  </Typography>
-                                                )}
-                                              </TableCell>
-                                              <TableCell>
-                                                {(() => {
-                                                  const rate = enrollment.overall_completion_rate || 0;
-                                                  let color = 'error.main';
-                                                  if (rate >= 75) {
-                                                    color = 'success.main';
-                                                  } else if (rate >= 60) {
-                                                    color = 'warning.main';
-                                                  }
-                                                  return (
-                                                    <Typography
-                                                      sx={{
-                                                        color: color,
-                                                        fontWeight: 600,
-                                                      }}
-                                                    >
-                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
-                                                    </Typography>
-                                                  );
-                                                })()}
-                                              </TableCell>
-                                              <TableCell>
-                                                <IconButton
-                                                  size="small"
-                                                  color="success"
-                                                  onClick={() => handleApprove(enrollment.id)}
-                                                  title="Approve (Admin Override)"
-                                                >
-                                                  <PersonAdd fontSize="small" />
-                                                </IconButton>
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                      </TableBody>
-                                    </Table>
-                                  </TableContainer>
-                                </Box>
-                              )}
-
-                              {/* Not Eligible Enrollments Section */}
-                              {courseEnrollments[course.id].filter(e => {
-                                if (e.eligibility_status === 'Eligible' || e.approval_status === 'Approved' || e.approval_status === 'Withdrawn' || e.approval_status === 'Rejected') return false;
-                                if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                return true;
-                              }).length > 0 && (
-                                <Box>
-                                  <Typography 
-                                    variant="h6" 
-                                    gutterBottom
-                                    sx={{ 
-                                      mb: 2,
-                                      color: theme.palette.error.main,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Not Eligible Enrollments ({courseEnrollments[course.id].filter(e => {
-                                      if (e.eligibility_status === 'Eligible' || e.approval_status === 'Approved' || e.approval_status === 'Withdrawn' || e.approval_status === 'Rejected') return false;
-                                      if (selectedSBU && e.student_sbu !== selectedSBU) return false;
-                                      return true;
-                                    }).length})
-                                  </Typography>
-                                  <TableContainer 
-                                    component={Paper} 
-                                    variant="outlined"
-                                    sx={{
-                                      borderRadius: 2,
-                                      border: `2px solid ${alpha(theme.palette.error.main, 0.3)}`,
-                                      backgroundColor: alpha(theme.palette.error.main, 0.02),
-                                    }}
-                                  >
-                                    <Table size="small">
-                                      <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(theme.palette.error.main, 0.1) }}>
-                                          <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Student Name</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Eligibility Reason</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Approval Status</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Overall Completion</TableCell>
-                                          <TableCell sx={{ fontWeight: 600 }}>Add</TableCell>
-                                        </TableRow>
-                                      </TableHead>
-                                      <TableBody>
-                                        {courseEnrollments[course.id]
-                                          .filter(enrollment => {
-                                            if (enrollment.eligibility_status === 'Eligible' || enrollment.approval_status === 'Approved' || enrollment.approval_status === 'Withdrawn' || enrollment.approval_status === 'Rejected') return false;
-                                            if (selectedSBU && enrollment.student_sbu !== selectedSBU) return false;
-                                            return true;
-                                          })
-                                          .sort((a, b) => {
-                                            // Extract numeric part from employee ID for proper sorting
-                                            const empIdA = a.student_employee_id || '';
-                                            const empIdB = b.student_employee_id || '';
-                                            // Try to extract numbers from employee IDs (e.g., "EMP143" -> 143)
-                                            const numA = parseInt(empIdA.replace(/\D/g, '')) || 0;
-                                            const numB = parseInt(empIdB.replace(/\D/g, '')) || 0;
-                                            if (numA !== numB) {
-                                              return numA - numB;
-                                            }
-                                            // If numbers are equal or not found, sort alphabetically
-                                            return empIdA.localeCompare(empIdB);
-                                          })
-                                          .map((enrollment) => (
-                                            <TableRow key={enrollment.id} hover>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_employee_id || '-'}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>
-                                                <Typography
-                                                  sx={{
-                                                    cursor: 'pointer',
-                                                    color: 'primary.main',
-                                                    textDecoration: 'underline',
-                                                    '&:hover': {
-                                                      color: 'primary.dark',
-                                                    },
-                                                  }}
-                                                  onClick={() => handleViewUserDetails(enrollment)}
-                                                >
-                                                  {enrollment.student_name}
-                                                </Typography>
-                                              </TableCell>
-                                              <TableCell>{enrollment.student_email}</TableCell>
-                                              <TableCell>
-                                                <Chip label={enrollment.student_sbu} size="small" />
-                                              </TableCell>
-                                              <TableCell>
-                                                <Box>
-                                                  <Chip
-                                                    label={enrollment.eligibility_status}
-                                                    color="error"
-                                                    size="small"
-                                                    sx={{ mb: enrollment.eligibility_reason ? 0.5 : 0 }}
-                                                  />
-                                                  {enrollment.eligibility_reason && (
-                                                    <Typography
-                                                      variant="caption"
-                                                      sx={{
-                                                        display: 'block',
-                                                        color: 'text.secondary',
-                                                        mt: 0.5,
-                                                        fontStyle: 'italic',
-                                                      }}
-                                                    >
-                                                      {enrollment.eligibility_reason}
-                                                    </Typography>
-                                                  )}
-                                                </Box>
-                                              </TableCell>
-                                              <TableCell>
-                                                <Chip
-                                                  label={enrollment.approval_status}
-                                                  color={
-                                                    enrollment.approval_status === 'Pending' ? 'warning' : 'default'
-                                                  }
-                                                  size="small"
-                                                />
-                                              </TableCell>
-                                              <TableCell>
-                                                {(() => {
-                                                  const rate = enrollment.overall_completion_rate || 0;
-                                                  let color = 'error.main';
-                                                  if (rate >= 75) {
-                                                    color = 'success.main';
-                                                  } else if (rate >= 60) {
-                                                    color = 'warning.main';
-                                                  }
-                                                  return (
-                                                    <Typography
-                                                      sx={{
-                                                        color: color,
-                                                        fontWeight: 600,
-                                                      }}
-                                                    >
-                                                      {rate}% ({enrollment.completed_courses || 0}/{enrollment.total_courses_assigned || 0})
-                                                    </Typography>
-                                                  );
-                                                })()}
-                                              </TableCell>
-                                              <TableCell>
-                                                {enrollment.approval_status === 'Pending' && (
-                                                  <IconButton
-                                                    size="small"
-                                                    color="success"
-                                                    onClick={() => handleApprove(enrollment.id)}
-                                                    title="Approve (Admin Override)"
-                                                  >
-                                                    <PersonAdd fontSize="small" />
-                                                  </IconButton>
-                                                )}
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                      </TableBody>
-                                    </Table>
-                                  </TableContainer>
-                                </Box>
-                              )}
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              No enrollments yet
-                            </Typography>
-                          )}
-                        </Box>
-                      </Collapse>
-                    </TableCell>
-                  </TableRow>
-                </React.Fragment>
-              ))}
+                    ))
+                  )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -1910,18 +686,8 @@ function Courses() {
         </>
       )}
 
-      <Dialog 
-        open={open} 
-        onClose={handleClose} 
-        maxWidth="md" 
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
-          }
-        }}
-      >
+      {/* Create Course Dialog */}
+      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 600 }}>Create New Course</DialogTitle>
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} mt={1}>
@@ -1951,23 +717,33 @@ function Courses() {
               <DatePicker
                 label="Start Date"
                 value={formData.start_date}
-                onChange={(date) => setFormData({ ...formData, start_date: date })}
-                renderInput={(params) => <TextField {...params} fullWidth required />}
+                onChange={(newValue) => setFormData({ ...formData, start_date: newValue })}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    required: true,
+                  },
+                }}
               />
               <DatePicker
                 label="End Date"
                 value={formData.end_date}
-                onChange={(date) => setFormData({ ...formData, end_date: date })}
-                renderInput={(params) => <TextField {...params} fullWidth />}
+                onChange={(newValue) => setFormData({ ...formData, end_date: newValue })}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                  },
+                }}
               />
             </LocalizationProvider>
             <TextField
               label="Seat Limit"
               type="number"
               value={formData.seat_limit}
-              onChange={(e) => setFormData({ ...formData, seat_limit: parseInt(e.target.value) })}
+              onChange={(e) => setFormData({ ...formData, seat_limit: parseInt(e.target.value) || 0 })}
               fullWidth
               required
+              inputProps={{ min: 0 }}
             />
             <TextField
               label="Total Classes Offered"
@@ -1975,941 +751,154 @@ function Courses() {
               value={formData.total_classes_offered}
               onChange={(e) => setFormData({ ...formData, total_classes_offered: e.target.value })}
               fullWidth
-              inputProps={{ min: 1 }}
+              helperText="Used for calculating attendance percentage"
+              inputProps={{ min: 0 }}
             />
             <TextField
               select
-              label="Prerequisite Course (Optional)"
+              label="Prerequisite Course"
               value={formData.prerequisite_course_id || ''}
-              onChange={(e) => setFormData({ ...formData, prerequisite_course_id: e.target.value ? parseInt(e.target.value) : null })}
+              onChange={(e) => setFormData({ ...formData, prerequisite_course_id: e.target.value || null })}
               fullWidth
-              helperText="Select a course that students must have passed (completed) before enrolling in this course"
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {courses
-                .filter(c => !c.is_archived && c.id !== (formData.id || -1)) // Exclude archived and current course
-                .map((course) => (
-                  <MenuItem key={course.id} value={course.id}>
-                    {course.name} - {course.batch_code}
-                  </MenuItem>
-                ))}
-            </TextField>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained">
-            Create
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Withdraw Dialog */}
-      <Dialog 
-        open={withdrawDialogOpen} 
-        onClose={handleWithdrawCancel} 
-        maxWidth="sm" 
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: `0 8px 32px ${alpha(theme.palette.error.main, 0.2)}`,
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 600 }}>Withdraw Student from Course</DialogTitle>
-        <DialogContent>
-          {selectedEnrollment && (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="body1" gutterBottom>
-                <strong>Student:</strong> {selectedEnrollment.student_name}
-              </Typography>
-              <Typography variant="body1" gutterBottom>
-                <strong>Course:</strong> {selectedEnrollment.course_name} - {selectedEnrollment.batch_code}
-              </Typography>
-              <TextField
-                label="Reason for Withdrawal"
-                multiline
-                rows={4}
-                fullWidth
-                value={withdrawalReason}
-                onChange={(e) => setWithdrawalReason(e.target.value)}
-                placeholder="e.g., Misbehavior, Violation of code of conduct, etc."
-                sx={{ mt: 2 }}
-                required
-              />
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleWithdrawCancel}>Cancel</Button>
-          <Button onClick={handleWithdrawConfirm} color="error" variant="contained">
-            Withdraw
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* User Details Dialog */}
-      <UserDetailsDialog
-        open={userDetailsOpen}
-        onClose={() => {
-          setUserDetailsOpen(false);
-          setSelectedUserEnrollment(null);
-        }}
-        enrollment={selectedUserEnrollment}
-        onViewCourseDetails={handleViewCourseDetails}
-      />
-
-      {/* Course Details Dialog */}
-      <CourseDetailsDialog
-        open={courseDetailsOpen}
-        onClose={() => {
-          setCourseDetailsOpen(false);
-          setSelectedCourseEnrollment(null);
-        }}
-        enrollment={selectedCourseEnrollment}
-      />
-
-      {/* Course Info Card Dialog */}
-      <Dialog
-        open={courseDetailsCardOpen}
-        onClose={() => {
-          if (!isEditingCourse) {
-            setCourseDetailsCardOpen(false);
-            setSelectedCourseForDetails(null);
-            setIsEditingCourse(false);
-          }
-        }}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Course Details
-          {!isEditingCourse && (
-            <Button
-              startIcon={<Edit />}
-              variant="outlined"
-              size="small"
-              onClick={() => setIsEditingCourse(true)}
-              sx={{ textTransform: 'none' }}
-            >
-              Edit
-            </Button>
-          )}
-        </DialogTitle>
-        <DialogContent>
-          {selectedCourseForDetails && (
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">Course Name</Typography>
-                {isEditingCourse ? (
-                  <TextField
-                    value={editCourseData.name}
-                    onChange={(e) => setEditCourseData({ ...editCourseData, name: e.target.value })}
-                    fullWidth
-                    size="small"
-                    sx={{ mt: 1 }}
-                    required
-                  />
-                ) : (
-                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.name}
-                  </Typography>
-                )}
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">Batch Code</Typography>
-                {isEditingCourse ? (
-                  <TextField
-                    value={editCourseData.batch_code}
-                    onChange={(e) => setEditCourseData({ ...editCourseData, batch_code: e.target.value })}
-                    fullWidth
-                    size="small"
-                    sx={{ mt: 1 }}
-                    required
-                  />
-                ) : (
-                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.batch_code}
-                  </Typography>
-                )}
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">Start Date</Typography>
-                {isEditingCourse ? (
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <DatePicker
-                      value={editCourseData.start_date}
-                      onChange={(newValue) => setEditCourseData({ ...editCourseData, start_date: newValue })}
-                      slotProps={{ textField: { size: 'small', fullWidth: true, sx: { mt: 1 } } }}
-                    />
-                  </LocalizationProvider>
-                ) : (
-                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.start_date || '-'}
-                  </Typography>
-                )}
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">End Date</Typography>
-                {isEditingCourse ? (
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <DatePicker
-                      value={editCourseData.end_date}
-                      onChange={(newValue) => setEditCourseData({ ...editCourseData, end_date: newValue })}
-                      slotProps={{ textField: { size: 'small', fullWidth: true, sx: { mt: 1 } } }}
-                    />
-                  </LocalizationProvider>
-                ) : (
-                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.end_date || '-'}
-                  </Typography>
-                )}
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">Seat Limit</Typography>
-                {isEditingCourse ? (
-                  <TextField
-                    type="number"
-                    value={editCourseData.seat_limit}
-                    onChange={(e) => setEditCourseData({ ...editCourseData, seat_limit: e.target.value })}
-                    fullWidth
-                    size="small"
-                    sx={{ mt: 1 }}
-                    inputProps={{ min: selectedCourseForDetails.current_enrolled }}
-                    helperText={`Currently enrolled: ${selectedCourseForDetails.current_enrolled}`}
-                  />
-                ) : (
-                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.seat_limit}
-                  </Typography>
-                )}
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">Currently Enrolled</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.current_enrolled}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">Available Seats</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                  {selectedCourseForDetails.seat_limit - selectedCourseForDetails.current_enrolled}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">Total Classes Offered</Typography>
-                {isEditingCourse ? (
-                  <TextField
-                    type="number"
-                    value={editCourseData.total_classes_offered}
-                    onChange={(e) => setEditCourseData({ ...editCourseData, total_classes_offered: e.target.value })}
-                    fullWidth
-                    size="small"
-                    sx={{ mt: 1 }}
-                    inputProps={{ min: 1 }}
-                    placeholder="Enter total classes"
-                  />
-                ) : (
-                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.total_classes_offered || 'Not set'}
-                  </Typography>
-                )}
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="body2" color="text.secondary">Prerequisite Course</Typography>
-                {isEditingCourse ? (
-                  <TextField
-                    select
-                    value={editCourseData.prerequisite_course_id || ''}
-                    onChange={(e) => setEditCourseData({ ...editCourseData, prerequisite_course_id: e.target.value ? parseInt(e.target.value) : null })}
-                    fullWidth
-                    size="small"
-                    sx={{ mt: 1 }}
                   >
                     <MenuItem value="">None</MenuItem>
-                    {courses
-                      .filter(c => c.id !== selectedCourseForDetails.id && !c.is_archived)
-                      .map((course) => (
+              {prerequisiteCourses.map((course) => (
                         <MenuItem key={course.id} value={course.id}>
-                          {course.name} - {course.batch_code}
+                  {course.name} ({course.batch_code})
                         </MenuItem>
                       ))}
                   </TextField>
-                ) : (
-                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.prerequisite_course_id 
-                      ? (() => {
-                          const prereqCourse = courses.find(c => c.id === selectedCourseForDetails.prerequisite_course_id);
-                          return prereqCourse ? `${prereqCourse.name} - ${prereqCourse.batch_code}` : 'Unknown';
-                        })()
-                      : 'None'}
-                  </Typography>
-                )}
-              </Grid>
-              <Grid item xs={12}>
-                <Typography variant="body2" color="text.secondary">Description</Typography>
-                {isEditingCourse ? (
-                  <TextField
-                    multiline
-                    rows={4}
-                    value={editCourseData.description}
-                    onChange={(e) => setEditCourseData({ ...editCourseData, description: e.target.value })}
-                    fullWidth
-                    sx={{ mt: 1 }}
-                    placeholder="Enter course description"
-                  />
-                ) : (
-                  <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                    {selectedCourseForDetails.description || 'No description'}
-                  </Typography>
-                )}
-              </Grid>
-            </Grid>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {isEditingCourse ? (
-            <>
-              <Button 
-                onClick={() => {
-                  setIsEditingCourse(false);
-                  // Reset to original values
-                  setEditCourseData({
-                    name: selectedCourseForDetails.name || '',
-                    batch_code: selectedCourseForDetails.batch_code || '',
-                    description: selectedCourseForDetails.description || '',
-                    start_date: selectedCourseForDetails.start_date ? new Date(selectedCourseForDetails.start_date) : null,
-                    end_date: selectedCourseForDetails.end_date ? new Date(selectedCourseForDetails.end_date) : null,
-                    seat_limit: selectedCourseForDetails.seat_limit || 0,
-                    total_classes_offered: selectedCourseForDetails.total_classes_offered || '',
-                    prerequisite_course_id: selectedCourseForDetails.prerequisite_course_id || null,
-                  });
-                }}
-                disabled={editCourseLoading}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSaveCourseEdit}
-                variant="contained"
-                disabled={editCourseLoading}
-                startIcon={editCourseLoading ? <CircularProgress size={20} /> : null}
-              >
-                Save Changes
-              </Button>
-            </>
-          ) : (
-            <Button onClick={() => {
-              setCourseDetailsCardOpen(false);
-              setSelectedCourseForDetails(null);
-              setIsEditingCourse(false);
+            
+            <Divider sx={{ my: 2 }} />
+            
+            {/* Course Creation Type Selection */}
+            <Box sx={{ 
+              p: 2, 
+              borderRadius: 2, 
+              bgcolor: alpha(theme.palette.primary.main, 0.05),
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
             }}>
-              Close
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-
-      {/* Import Dialog */}
-      <Dialog
-        open={importDialogOpen}
-        onClose={handleCloseImport}
-        maxWidth="lg"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 600 }}>
-          Import Enrollment Registrations - {selectedCourseForImport?.name} ({selectedCourseForImport?.batch_code})
-        </DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} mt={1}>
-            <Typography variant="body2" color="text.secondary">
-              Upload an Excel (.xlsx, .xls) or CSV file with enrollment registration data. Required columns: employee_id, name, email, sbu. Optional: designation
-            </Typography>
-            
-            {/* Preview Section */}
-            <Box>
-              <Box 
-                display="flex" 
-                alignItems="center" 
-                justifyContent="space-between"
-                sx={{ 
-                  cursor: 'pointer',
-                  p: 1,
-                  borderRadius: 1,
-                  '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.05) }
-                }}
-                onClick={() => setShowEnrollmentPreview(!showEnrollmentPreview)}
-              >
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Visibility fontSize="small" />
-                  Preview Expected Format
-                </Typography>
-                <IconButton size="small">
-                  {showEnrollmentPreview ? <ExpandLess /> : <ExpandMore />}
-                </IconButton>
-              </Box>
-              
-              <Collapse in={showEnrollmentPreview}>
-                <Box mt={1} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, borderRadius: 2, overflow: 'hidden' }}>
-                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-end', borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<Download />}
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = '/ADA2025A_registration.xlsx';
-                        link.download = 'ADA2025A_registration.xlsx';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Download Template
-                    </Button>
-                  </Box>
-                  <TableContainer>
-                    <Table size="small" sx={{ minWidth: 650 }}>
-                      <TableHead>
-                        <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>employee_id</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>name</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>email</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>sbu</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>designation</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {enrollmentPreviewData.map((row, index) => (
-                          <TableRow 
-                            key={index}
-                            sx={{ 
-                              '&:nth-of-type(odd)': { backgroundColor: alpha(theme.palette.primary.main, 0.02) }
-                            }}
-                          >
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.employee_id}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.name}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.email}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>
-                              <Chip label={row.sbu} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
-                            </TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.designation}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                  <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      <strong>Note:</strong> Column names are case-insensitive. SBU values: IT, HR, Finance, Operations, Sales, Marketing, Other. 
-                      Designation is optional. The file will be imported for the selected course automatically.
-                    </Typography>
-                  </Box>
-                </Box>
-              </Collapse>
-            </Box>
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<UploadFile />}
-              sx={{
-                borderRadius: 2,
-                textTransform: 'none',
-                borderStyle: 'dashed',
-                borderWidth: 2,
-              }}
-            >
-              Select File
-              <input type="file" hidden accept=".xlsx,.xls,.csv" onChange={handleImportFileChange} />
-            </Button>
-            {importFile && (
-              <Typography
-                variant="body2"
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  color: theme.palette.primary.main,
-                  fontWeight: 500,
-                }}
-              >
-                Selected: {importFile.name}
-              </Typography>
-            )}
-            <Box display="flex" gap={2}>
-              <Button
-                variant="contained"
-                onClick={handleImportExcel}
-                disabled={!importFile || importLoading}
-                sx={{
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 500,
-                }}
-              >
-                Upload Excel
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleImportCSV}
-                disabled={!importFile || importLoading}
-                sx={{
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 500,
-                }}
-              >
-                Upload CSV
-              </Button>
-            </Box>
-            {importLoading && <CircularProgress size={24} />}
-            {importResults && (
-              <Card
-                sx={{
-                  mt: 2,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                }}
-              >
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                    Import Results
-                  </Typography>
-                  <List>
-                    <ListItem>
-                      <ListItemText primary="Total Records" secondary={importResults.total} />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText primary="Processed" secondary={importResults.processed} />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText primary="Eligible" secondary={importResults.eligible} />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText primary="Ineligible" secondary={importResults.ineligible} />
-                    </ListItem>
-                    {importResults.not_found !== undefined && importResults.not_found > 0 && (
-                      <ListItem>
-                        <ListItemText
-                          primary="Not Found"
-                          secondary={`${importResults.not_found} employees not found`}
-                        />
-                      </ListItem>
-                    )}
-                    {importResults.errors && importResults.errors.length > 0 && (
-                      <ListItem>
-                        <ListItemText
-                          primary="Errors"
-                          secondary={`${importResults.errors.length} errors occurred`}
-                        />
-                      </ListItem>
-                    )}
-                  </List>
-                </CardContent>
-              </Card>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseImport}>Close</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Manual Enrollment Dialog */}
-      <Dialog
-        open={manualEnrollDialogOpen}
-        onClose={handleCloseManualEnroll}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 600 }}>
-          Add Student to {selectedCourseForEnroll?.name} ({selectedCourseForEnroll?.batch_code})
-        </DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} mt={1}>
-            {loadingStudents ? (
-              <Box display="flex" justifyContent="center" p={2}>
-                <CircularProgress />
-              </Box>
-            ) : (
-              <Autocomplete
-                options={students}
-                getOptionLabel={(option) => option ? `${option.name} (${option.employee_id}) - ${option.email}` : ''}
-                value={students.find(s => s.id === parseInt(selectedStudentId)) || null}
-                onChange={(event, newValue) => {
-                  setSelectedStudentId(newValue ? newValue.id.toString() : '');
-                }}
-                filterOptions={(options, { inputValue }) => {
-                  const searchLower = inputValue.toLowerCase();
-                  return options.filter((student) =>
-                    student.name?.toLowerCase().includes(searchLower) ||
-                    student.email?.toLowerCase().includes(searchLower) ||
-                    student.employee_id?.toLowerCase().includes(searchLower)
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Search and Select Student"
-                    placeholder="Type to search by name, email, or employee ID..."
-                    InputProps={{
-                      ...params.InputProps,
-                      startAdornment: (
-                        <>
-                          <InputAdornment position="start">
-                            <Search />
-                          </InputAdornment>
-                          {params.InputProps.startAdornment}
-                        </>
-                      ),
-                    }}
-                    required
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={createAsDraft}
+                    onChange={(e) => setCreateAsDraft(e.target.checked)}
+                    color="primary"
                   />
-                )}
-                renderOption={(props, student) => (
-                  <Box component="li" {...props} key={student.id}>
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {student.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {student.employee_id} • {student.email}
-                      </Typography>
-                    </Box>
+                }
+                label={
+                  <Box>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      Create as Planning Course (Draft)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {createAsDraft 
+                        ? 'Course will be created in planning stage. You can assign mentors, set costs, and add comments before approving it to move to ongoing courses.'
+                        : 'Course will be created directly as ongoing. All mentor assignments and costs will be permanent immediately.'}
+                    </Typography>
                   </Box>
-                )}
-                noOptionsText="No students found"
-                ListboxProps={{
-                  style: {
-                    maxHeight: 300,
-                  },
-                }}
+                }
               />
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseManualEnroll}>Cancel</Button>
-          <Button 
-            onClick={handleManualEnrollConfirm} 
-            variant="contained"
-            disabled={!selectedStudentId || loadingStudents}
-          >
-            Enroll Student
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Attendance & Scores Upload Dialog */}
-      <Dialog
-        open={attendanceScoresDialogOpen}
-        onClose={handleCloseAttendanceScores}
-        maxWidth="lg"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 600 }}>
-          Upload Attendance & Scores - {selectedCourseForAttendance?.name} ({selectedCourseForAttendance?.batch_code})
-        </DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} mt={1}>
-            <Typography variant="body2" color="text.secondary">
-              Upload an Excel (.xlsx, .xls) or CSV file with attendance and score data. Required columns: bsid (or employee_id), name, email, total_classes_attended, score
-            </Typography>
+              {!createAsDraft && (
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  Direct creation will make all mentor assignments and costs permanent. Consider using Planning mode if you need to review before making it official.
+                </Alert>
+              )}
+            </Box>
             
-            {/* Preview Section */}
+            <Divider sx={{ my: 2 }} />
+            
             <Box>
-              <Box 
-                display="flex" 
-                alignItems="center" 
-                justifyContent="space-between"
-                sx={{ 
-                  cursor: 'pointer',
-                  p: 1,
-                  borderRadius: 1,
-                  '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.05) }
-                }}
-                onClick={() => setShowAttendancePreview(!showAttendancePreview)}
-              >
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Visibility fontSize="small" />
-                  Preview Expected Format
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Assign Mentors 
                 </Typography>
-                <IconButton size="small">
-                  {showAttendancePreview ? <ExpandLess /> : <ExpandMore />}
-                </IconButton>
-              </Box>
-              
-              <Collapse in={showAttendancePreview}>
-                <Box mt={1} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, borderRadius: 2, overflow: 'hidden' }}>
-                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-end', borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                <Box display="flex" gap={1}>
                     <Button
                       variant="outlined"
                       size="small"
-                      startIcon={<Download />}
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = '/ADA2025A_completion.xlsx';
-                        link.download = 'ADA2025A_completion.xlsx';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Download Template
+                    startIcon={<PersonAdd />}
+                    onClick={() => setAssignInternalMentorDialogOpen(true)}
+                  >
+                    Assign Internal
                     </Button>
-                  </Box>
-                  <TableContainer>
-                    <Table size="small" sx={{ minWidth: 650 }}>
-                      <TableHead>
-                        <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>bsid</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>name</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>email</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>total_classes_attended</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>score</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {attendancePreviewData.map((row, index) => (
-                          <TableRow 
-                            key={index}
-                            sx={{ 
-                              '&:nth-of-type(odd)': { backgroundColor: alpha(theme.palette.primary.main, 0.02) }
-                            }}
-                          >
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.bsid}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.name}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.email}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.total_classes_attended}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.score}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                  <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      <strong>Note:</strong> Column names are case-insensitive. bsid can also be employee_id. total_classes_attended should not exceed the course's "Total Classes Offered". 
-                      Score is typically a percentage (0-100). Completion status will be automatically calculated based on attendance percentage (≥80% = Completed).
-                    </Typography>
-                  </Box>
-                </Box>
-              </Collapse>
-            </Box>
-            {(!selectedCourseForAttendance?.total_classes_offered || selectedCourseForAttendance.total_classes_offered <= 0) && (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                This course does not have "Total Classes Offered" set. Please set it in the course settings before uploading attendance and scores.
-              </Alert>
-            )}
             <Button
               variant="outlined"
-              component="label"
-              startIcon={<UploadFile />}
-              sx={{
-                borderRadius: 2,
-                textTransform: 'none',
-                borderStyle: 'dashed',
-                borderWidth: 2,
-              }}
-            >
-              Select File
-              <input type="file" hidden accept=".xlsx,.xls,.csv" onChange={handleAttendanceScoresFileChange} />
-            </Button>
-            {attendanceScoresFile && (
-              <Typography
-                variant="body2"
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  color: theme.palette.primary.main,
-                  fontWeight: 500,
-                }}
-              >
-                Selected: {attendanceScoresFile.name}
-              </Typography>
-            )}
-            <Box display="flex" gap={2}>
-              <Button
-                variant="contained"
-                onClick={handleUploadAttendanceExcel}
-                disabled={!attendanceScoresFile || attendanceScoresLoading}
-                sx={{
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 500,
-                }}
-              >
-                Upload Excel
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleUploadAttendanceCSV}
-                disabled={!attendanceScoresFile || attendanceScoresLoading}
-                sx={{
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 500,
-                }}
-              >
-                Upload CSV
+                    size="small"
+                    startIcon={<Add />}
+                    onClick={() => setAddExternalMentorDialogOpen(true)}
+                  >
+                    Add External
               </Button>
             </Box>
-            {attendanceScoresLoading && <CircularProgress size={24} />}
-            {attendanceScoresResults && (
-              <Card
-                sx={{
-                  mt: 2,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                }}
-              >
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                    Upload Results
-                  </Typography>
-                  <List>
-                    <ListItem>
-                      <ListItemText primary="Processed" secondary={attendanceScoresResults.processed} />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText primary="Updated" secondary={attendanceScoresResults.updated} />
-                    </ListItem>
-                    {attendanceScoresResults.not_found !== undefined && attendanceScoresResults.not_found > 0 && (
-                      <ListItem>
-                        <ListItemText
-                          primary="Not Found"
-                          secondary={`${attendanceScoresResults.not_found} students not found`}
-                        />
-                      </ListItem>
-                    )}
-                    {attendanceScoresResults.errors && attendanceScoresResults.errors.length > 0 && (
-                      <ListItem>
-                        <ListItemText
-                          primary="Errors"
-                          secondary={`${attendanceScoresResults.errors.length} errors occurred`}
-                        />
-                      </ListItem>
-                    )}
-                  </List>
-                </CardContent>
-              </Card>
-            )}
           </Box>
+              
+              {selectedMentors.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  No mentors assigned. Click "Assign Internal" or "Add External" to assign mentors to this course.
+                </Typography>
+              ) : (
+                <Box display="flex" flexDirection="column" gap={1}>
+                  {selectedMentors.map((mentor, index) => (
+                    <Card key={index} variant="outlined" sx={{ p: 1.5 }}>
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            {mentor.mentor_name || `Mentor ${index + 1}`}
+                            {mentor.is_internal ? (
+                              <Chip label="Internal" size="small" sx={{ ml: 1 }} color="primary" />
+                            ) : (
+                              <Chip label="External" size="small" sx={{ ml: 1 }} color="secondary" />
+                            )}
+                          </Typography>
+            <Typography variant="body2" color="text.secondary">
+                            Hours: {mentor.hours_taught || 0} | Amount: Tk {mentor.amount_paid || 0}
+            </Typography>
+              </Box>
+                        <IconButton
+                      size="small"
+                          color="error"
+                          onClick={() => handleRemoveMentor(index)}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                  </Box>
+                    </Card>
+                  ))}
+                  </Box>
+              )}
+                </Box>
+            </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseAttendanceScores}>Close</Button>
+          <Button onClick={handleClose}>Cancel</Button>
+            <Button
+            onClick={handleSubmit} 
+                variant="contained"
+            disabled={!formData.name || !formData.batch_code || !formData.start_date || formData.seat_limit <= 0}
+          >
+            Create
+              </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Edit Attendance & Score Dialog */}
-      <Dialog
-        open={editAttendanceDialogOpen}
-        onClose={handleCloseEditAttendance}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`,
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 600 }}>Update Attendance & Score</DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} mt={1}>
-            {selectedEnrollmentForEdit && (
-              <>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Student:</strong> {selectedEnrollmentForEdit.student_name} ({selectedEnrollmentForEdit.student_employee_id})
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Course:</strong> {selectedEnrollmentForEdit.course_name} - {selectedEnrollmentForEdit.batch_code}
-                </Typography>
-                {expandedCourse && courses.find(c => c.id === expandedCourse)?.total_classes_offered && (
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Total Classes Offered:</strong> {courses.find(c => c.id === expandedCourse).total_classes_offered}
-                  </Typography>
-                )}
-              </>
-            )}
-            <TextField
-              label="Classes Attended"
-              type="number"
-              value={editClassesAttended}
-              onChange={(e) => setEditClassesAttended(e.target.value)}
-              fullWidth
-              required
-              inputProps={{ min: 0, max: expandedCourse ? courses.find(c => c.id === expandedCourse)?.total_classes_offered : undefined }}
-              helperText={expandedCourse && courses.find(c => c.id === expandedCourse)?.total_classes_offered 
-                ? `Maximum: ${courses.find(c => c.id === expandedCourse).total_classes_offered} classes`
-                : 'Enter the number of classes attended'}
-            />
-            <TextField
-              label="Score"
-              type="number"
-              value={editScore}
-              onChange={(e) => setEditScore(e.target.value)}
-              fullWidth
-              required
-              inputProps={{ min: 0, max: 100, step: 0.1 }}
-              helperText="Enter score (0-100). Completion status will be automatically updated based on 80% attendance threshold."
-            />
-            {editClassesAttended && expandedCourse && courses.find(c => c.id === expandedCourse)?.total_classes_offered && (
-              <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
-                Attendance: {((parseInt(editClassesAttended) || 0) / courses.find(c => c.id === expandedCourse).total_classes_offered * 100).toFixed(1)}%
-                {((parseInt(editClassesAttended) || 0) / courses.find(c => c.id === expandedCourse).total_classes_offered * 100) >= 80 
-                  ? ' (Will be marked as Completed)' 
-                  : ' (Will be marked as Failed)'}
-              </Typography>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseEditAttendance} disabled={editAttendanceLoading}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleEditAttendance} 
-            variant="contained"
-            disabled={editAttendanceLoading || !editClassesAttended || !editScore}
-          >
-            {editAttendanceLoading ? <CircularProgress size={24} /> : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Assign Internal Mentor Dialog */}
+      <AssignInternalMentorDialog
+        open={assignInternalMentorDialogOpen}
+        onClose={() => setAssignInternalMentorDialogOpen(false)}
+        onAssign={handleAssignInternalMentor}
+        isDraft={createAsDraft} // Use the checkbox state
+      />
+
+      {/* Add External Mentor Dialog */}
+      <AddExternalMentorDialog
+        open={addExternalMentorDialogOpen}
+        onClose={() => setAddExternalMentorDialogOpen(false)}
+        onAdd={handleAddExternalMentor}
+        isDraft={createAsDraft} // Use the checkbox state
+      />
     </Box>
   );
 }
 
 export default Courses;
-

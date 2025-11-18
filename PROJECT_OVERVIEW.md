@@ -4,7 +4,7 @@
 
 ### Database: PostgreSQL (`enrollment_db`)
 
-**Total Tables: 3**
+**Total Tables: 5**
 
 #### 1. **`students`** Table
 **Purpose:** Stores employee/student information
@@ -40,11 +40,14 @@
 - `total_classes_offered` (Integer, Nullable) - Used for attendance calculation
 - `prerequisite_course_id` (Integer, Foreign Key to courses.id, Nullable)
 - `is_archived` (Boolean, Default: False)
+- `food_cost` (Numeric(10, 2), Default: 0.0) - Food cost for the course
+- `other_cost` (Numeric(10, 2), Default: 0.0) - Other miscellaneous costs
 - `created_at` (DateTime)
 - `updated_at` (DateTime)
 
 **Relationships:**
 - One-to-Many with `enrollments` (NO cascade - preserves enrollments when course deleted)
+- One-to-Many with `course_mentors` (cascade delete)
 - Self-referential for prerequisites
 
 ---
@@ -109,6 +112,51 @@
 
 ---
 
+#### 5. **`mentors`** Table
+**Purpose:** Stores mentor information (internal employees or external mentors)
+
+**Columns:**
+- `id` (Integer, Primary Key)
+- `is_internal` (Boolean, Default: True) - True if mentor is an internal employee
+- `student_id` (Integer, Foreign Key to students.id, Nullable, Unique) - Required if is_internal=True
+- `name` (String, Required) - Mentor name
+- `email` (String, Nullable) - Mentor email
+- `sbu` (Enum: IT, HR, Finance, Operations, Sales, Marketing, Other, Nullable) - For internal mentors, may mirror student
+- `designation` (String, Nullable) - For internal mentors, may mirror student
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+
+**Relationships:**
+- Many-to-One with `students` (if internal)
+- One-to-Many with `course_mentors`
+
+**Constraints:**
+- If `is_internal = True`, `student_id` must be non-null and unique (one mentor record per student)
+- If `is_internal = False`, `student_id` must be null
+
+---
+
+#### 6. **`course_mentors`** Table
+**Purpose:** Association table for course-mentor assignments with payment and hours tracking
+
+**Columns:**
+- `id` (Integer, Primary Key)
+- `course_id` (Integer, Foreign Key to courses.id, Required)
+- `mentor_id` (Integer, Foreign Key to mentors.id, Required)
+- `hours_taught` (Numeric(10, 2), Default: 0.0) - Hours taught by mentor for this course
+- `amount_paid` (Numeric(10, 2), Default: 0.0) - Payment amount for this mentor-course assignment
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+
+**Relationships:**
+- Many-to-One with `courses`
+- Many-to-One with `mentors`
+
+**Constraints:**
+- Unique constraint on (`course_id`, `mentor_id`) - one assignment per mentor per course
+
+---
+
 ## 📁 Project Structure
 
 ### Root Directory
@@ -144,11 +192,15 @@ Onsite_User_Management/
 - **`student.py`** - Student model and SBU enum
 - **`course.py`** - Course model
 - **`enrollment.py`** - Enrollment and IncomingEnrollment models, status enums
+- **`mentor.py`** - Mentor model
+- **`course_mentor.py`** - CourseMentor association model
 
 #### **`/app/schemas/`** - Pydantic Schemas (API Request/Response)
 - **`student.py`** - StudentCreate, StudentResponse
-- **`course.py`** - CourseCreate, CourseResponse
+- **`course.py`** - CourseCreate, CourseResponse, CourseCostUpdate
 - **`enrollment.py`** - EnrollmentResponse, EnrollmentApproval, etc.
+- **`mentor.py`** - MentorCreate, MentorUpdate, MentorResponse
+- **`course_mentor.py`** - CourseMentorCreate, CourseMentorUpdate, CourseMentorResponse
 
 #### **`/app/api/`** - API Endpoints (Routers)
 - **`auth.py`** - Authentication endpoints
@@ -161,14 +213,28 @@ Onsite_User_Management/
   - `GET /students/{id}` - Get single student
   - `GET /students/{id}/enrollments` - Get student's enrollments
   - `GET /students/all/with-courses` - Get all students with course history
+  - `POST /students/{id}/mentor-tag` - Tag student as mentor (create internal mentor)
+  - `DELETE /students/{id}/mentor-tag` - Remove mentor tag from student
 
 - **`courses.py`** - Course management
   - `POST /courses` - Create course
   - `GET /courses` - List courses (with filters)
-  - `GET /courses/{id}` - Get single course
+  - `GET /courses/{id}` - Get single course (includes mentors and total training cost)
   - `PUT /courses/{id}` - Update course
   - `DELETE /courses/{id}` - Delete course permanently
   - `POST /courses/{id}/archive` - Archive course
+  - `PUT /courses/{id}/costs` - Update food_cost and other_cost
+  - `POST /courses/{id}/mentors` - Assign mentor to course
+  - `DELETE /courses/{id}/mentors/{course_mentor_id}` - Remove mentor assignment
+
+- **`mentors.py`** - Mentor management
+  - `GET /mentors` - List mentors (with type filter: all, internal, external)
+  - `POST /mentors` - Create external mentor
+  - `POST /mentors/internal/{student_id}` - Create internal mentor from student
+  - `GET /mentors/{id}` - Get single mentor
+  - `PUT /mentors/{id}` - Update mentor details
+  - `GET /mentors/{id}/stats` - Get mentor statistics (courses, hours, payments, completion ratios)
+  - `DELETE /mentors/{id}` - Delete external mentor (internal mentors cannot be deleted)
 
 - **`enrollments.py`** - Enrollment management
   - `GET /enrollments` - List enrollments (with filters, pagination)
@@ -248,7 +314,10 @@ Onsite_User_Management/
   - `001_initial_schema.py` - Initial database schema
   - `042226f406cc_add_total_classes_offered_to_courses.py`
   - `6e36db3a7375_add_course_name_batch_code_to_enrollments.py`
+  - `87f7756d1085_change_batch_code_to_composite_unique_.py`
+  - `9dd22bdb26e4_add_is_active_to_students.py`
   - `fc8b96f4698b_add_attendance_fields_to_enrollments.py`
+  - `a1b2c3d4e5f6_add_mentors_and_course_costs.py` - Adds mentors, course_mentors tables and cost fields
 
 ### **`/backend/tests/`** - Test Suite
 - **`run_all_tests.py`** - Test runner script
@@ -291,27 +360,48 @@ Onsite_User_Management/
 - **`Login.js`** - Admin login page
   - Redirects to `/courses` after successful login
 
-- **`Courses.js`** - Unified course and enrollment management page
+- **`Courses.js`** - Course list page (list-only view)
   - Course list with Active/Archived toggle
   - Create/Edit/Delete courses (with prerequisites)
-  - Expand course to view enrollments organized by status:
+  - Search and filter functionality
+  - Click course row or "View Details" button to navigate to CourseDetail page
+  - Generate course reports
+
+- **`CourseDetail.js`** - Course detail and enrollment management page
+  - Course details card with all metadata (name, batch code, dates, seat limits, prerequisites)
+  - **Mentors Section**: 
+    - List of assigned mentors with hours taught and amount paid
+    - Assign internal mentors (from existing mentors)
+    - Add external mentors
+    - Remove mentor assignments
+  - **Costs Section**:
+    - Food cost and other cost (editable)
+    - Total mentor costs (computed)
+    - Total training cost (computed: mentor costs + food + other)
+  - **Enrollment Sections**:
     - **Approved/Enrolled Students**: All approved students with score, attendance, completion status
     - **Eligible Enrollments (Pending)**: Pending eligible students ready for approval
-    - **Not Eligible Enrollments**: All non-approved ineligible students (pending and rejected)
+    - **Not Eligible Enrollments**: All non-approved ineligible students (pending and rejected) with eligibility reasons
     - **Withdrawn Students**: All withdrawn students with reinstatement option
   - Import enrollments (Excel/CSV) - single file upload
   - Upload attendance & scores (Excel/CSV) - single file with both attendance and scores
   - Manual student enrollment with search functionality
-  - Course details card with prerequisite information
   - Edit attendance & score for individual approved students
   - Approve/Reject/Withdraw/Reapprove actions
 
 - **`Users.js`** - User management page
   - All employees list (sorted by employee ID)
+  - **Mentor tagging**: Clickable chip to tag/untag employees as mentors
   - Course history (expandable) - last column
   - Filter by "Never Taken Course" or "Has Taken Courses"
   - Overall completion rate display (color-coded)
   - Click employee ID to view full user details
+
+- **`Mentors.js`** - Mentor management page
+  - List all mentors (internal and external)
+  - Filter by type: All, Internal, External
+  - View mentor statistics (total courses, hours, payments, per-course details)
+  - Shows completion ratios per course for each mentor
 
 - **`Enrollments.js`** - (Deprecated - functionality moved to Courses.js)
   - This file exists but is no longer used in the application
@@ -341,11 +431,12 @@ Onsite_User_Management/
 - Axios instance configuration (10s timeout)
 - API endpoint definitions:
   - `authAPI` - Authentication
-  - `studentsAPI` - Student management
-  - `coursesAPI` - Course management
+  - `studentsAPI` - Student management (includes mentor tagging endpoints)
+  - `coursesAPI` - Course management (includes mentor and cost management endpoints)
   - `enrollmentsAPI` - Enrollment management
   - `importsAPI` - Data import
   - `completionsAPI` - Completion tracking
+  - `mentorsAPI` - Mentor management
 
 ### **`/frontend/public/`** - Static Files
 - `index.html` - HTML template
@@ -368,14 +459,28 @@ Onsite_User_Management/
 - `GET /api/v1/students/{id}` - Get student
 - `GET /api/v1/students/{id}/enrollments` - Get student enrollments
 - `GET /api/v1/students/all/with-courses` - Get all with course history
+- `POST /api/v1/students/{id}/mentor-tag` - Tag student as mentor
+- `DELETE /api/v1/students/{id}/mentor-tag` - Remove mentor tag from student
 
 ### Courses (Protected)
 - `POST /api/v1/courses` - Create course
 - `GET /api/v1/courses` - List courses (filters: archived)
-- `GET /api/v1/courses/{id}` - Get course
+- `GET /api/v1/courses/{id}` - Get course (includes mentors and total training cost)
 - `PUT /api/v1/courses/{id}` - Update course
 - `DELETE /api/v1/courses/{id}` - Delete course
 - `POST /api/v1/courses/{id}/archive` - Archive course
+- `PUT /api/v1/courses/{id}/costs` - Update food_cost and other_cost
+- `POST /api/v1/courses/{id}/mentors` - Assign mentor to course
+- `DELETE /api/v1/courses/{id}/mentors/{course_mentor_id}` - Remove mentor assignment
+
+### Mentors (Protected)
+- `GET /api/v1/mentors` - List mentors (filters: type=all|internal|external)
+- `POST /api/v1/mentors` - Create external mentor
+- `POST /api/v1/mentors/internal/{student_id}` - Create internal mentor from student
+- `GET /api/v1/mentors/{id}` - Get mentor
+- `PUT /api/v1/mentors/{id}` - Update mentor
+- `GET /api/v1/mentors/{id}/stats` - Get mentor statistics
+- `DELETE /api/v1/mentors/{id}` - Delete external mentor
 
 ### Enrollments (Protected)
 - `GET /api/v1/enrollments` - List enrollments (filters: course_id, student_id, eligibility_status, approval_status, sbu, pagination)
@@ -481,8 +586,24 @@ Onsite_User_Management/
    - Course history tracking
    - Filter by "Never Taken Course"
    - Overall completion rate per user
+   - Mentor tagging (tag employees as mentors)
 
-5. **Data Preservation:**
+5. **Mentor Management:**
+   - Internal mentors (from existing employees)
+   - External mentors (not in employees table)
+   - Assign mentors to courses
+   - Track hours taught and payments per mentor-course assignment
+   - Mentor statistics (total courses, hours, payments, completion ratios)
+   - View mentor details and course history
+
+6. **Course Cost Tracking:**
+   - Food cost per course
+   - Other miscellaneous costs per course
+   - Mentor payment tracking per course
+   - Total training cost calculation (mentor costs + food + other)
+   - Cost management in course detail page
+
+7. **Data Preservation:**
    - Course history preserved when course is deleted
    - Denormalized course_name and batch_code in enrollments
 

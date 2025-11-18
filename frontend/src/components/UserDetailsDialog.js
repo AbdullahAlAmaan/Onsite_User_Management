@@ -149,6 +149,62 @@ function UserDetailsDialog({ open, onClose, enrollment, onViewCourseDetails, onA
             </Typography>
           </Grid>
           
+          <Grid item xs={12} sm={6}>
+            <Typography variant="body2" color="text.secondary">
+              Total Experience
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              {enrollment.student_career_start_date ? (
+                (() => {
+                  const start = new Date(enrollment.student_career_start_date);
+                  const today = new Date();
+                  const diffTime = Math.abs(today - start);
+                  const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+                  return `${diffYears.toFixed(1)} years`;
+                })()
+              ) : 'N/A'}
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12} sm={6}>
+            <Typography variant="body2" color="text.secondary">
+              BS Experience
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              {enrollment.student_bs_joining_date ? (
+                (() => {
+                  const start = new Date(enrollment.student_bs_joining_date);
+                  const today = new Date();
+                  const diffTime = Math.abs(today - start);
+                  const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+                  return `${diffYears.toFixed(1)} years`;
+                })()
+              ) : 'N/A'}
+            </Typography>
+          </Grid>
+          
+          {enrollment.student_career_start_date && (
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary">
+                Career Start Date
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                {new Date(enrollment.student_career_start_date).toLocaleDateString()}
+              </Typography>
+            </Grid>
+          )}
+          
+          {enrollment.student_bs_joining_date && (
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary">
+                BS Joining Date
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                {new Date(enrollment.student_bs_joining_date).toLocaleDateString()}
+              </Typography>
+            </Grid>
+          )}
+          
           <Grid item xs={12} sx={{ mt: 2 }}>
             <Card
               sx={{

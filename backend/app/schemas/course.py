@@ -1,6 +1,11 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, date
+from decimal import Decimal
+from app.schemas.course_mentor import CourseMentorResponse
+from app.schemas.course_comment import CourseCommentResponse
+from app.schemas.course_draft import CourseDraftResponse
+from app.models.course import CourseStatus
 
 class CourseCreate(BaseModel):
     name: str
@@ -11,6 +16,7 @@ class CourseCreate(BaseModel):
     seat_limit: int
     total_classes_offered: Optional[int] = None
     prerequisite_course_id: Optional[int] = None
+    status: Optional[CourseStatus] = CourseStatus.DRAFT  # Default to draft for planning courses
 
 class CourseUpdate(BaseModel):
     name: Optional[str] = None
@@ -20,6 +26,10 @@ class CourseUpdate(BaseModel):
     seat_limit: Optional[int] = None
     total_classes_offered: Optional[int] = None
     prerequisite_course_id: Optional[int] = None
+
+class CourseCostUpdate(BaseModel):
+    food_cost: Optional[Decimal] = None
+    other_cost: Optional[Decimal] = None
 
 class CourseResponse(BaseModel):
     id: int
@@ -33,6 +43,13 @@ class CourseResponse(BaseModel):
     total_classes_offered: Optional[int]
     prerequisite_course_id: Optional[int]
     is_archived: bool
+    status: CourseStatus
+    food_cost: Decimal
+    other_cost: Decimal
+    total_training_cost: Optional[Decimal] = None  # Computed server-side
+    mentors: Optional[List[CourseMentorResponse]] = None
+    comments: Optional[List[CourseCommentResponse]] = None
+    draft: Optional[CourseDraftResponse] = None
     created_at: datetime
     updated_at: datetime
     

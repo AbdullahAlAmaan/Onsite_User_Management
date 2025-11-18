@@ -9,7 +9,9 @@ import pandas as pd
 import io
 from app.db.base import get_db
 from app.models.student import Student
+from app.models.mentor import Mentor
 from app.schemas.student import StudentCreate, StudentResponse
+from app.schemas.mentor import MentorResponse
 from app.core.file_utils import sanitize_filename, validate_file_extension, validate_file_size, get_safe_file_path
 from app.services.import_service import ImportService
 
@@ -537,4 +539,61 @@ def generate_overall_report(db: Session = Depends(get_db)):
         error_details = traceback.format_exc()
         print(f"Error generating overall report: {error_details}")
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
+
+@router.post("/{student_id}/mentor-tag", response_model=MentorResponse, status_code=201)
+def tag_student_as_mentor(student_id: int, db: Session = Depends(get_db)):
+    """Tag a student as a mentor (creates internal mentor record if it doesn't exist)."""
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Check if mentor already exists for this student
+    existing_mentor = db.query(Mentor).filter(Mentor.student_id == student_id).first()
+    if existing_mentor:
+        return MentorResponse.from_orm(existing_mentor)
+    
+    # Create mentor record with student data
+    db_mentor = Mentor(
+        is_internal=True,
+        student_id=student_id,
+        name=student.name,
+        email=student.email,
+        sbu=student.sbu,
+        designation=student.designation
+    )
+    db.add(db_mentor)
+    db.commit()
+    db.refresh(db_mentor)
+    return MentorResponse.from_orm(db_mentor)
+
+@router.delete("/{student_id}/mentor-tag", status_code=204)
+def remove_mentor_tag(student_id: int, db: Session = Depends(get_db)):
+    """Remove mentor tag from a student (deletes internal mentor record if no course assignments exist)."""
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    mentor = db.query(Mentor).filter(Mentor.student_id == student_id).first()
+    if not mentor:
+        # Already not a mentor, return success
+        return None
+    
+    if not mentor.is_internal:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot remove tag from external mentor. Use mentors API to delete external mentors."
+        )
+    
+    # Check if mentor has course assignments
+    from app.models.course_mentor import CourseMentor
+    assignments = db.query(CourseMentor).filter(CourseMentor.mentor_id == mentor.id).count()
+    if assignments > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot remove mentor tag: mentor has existing course assignments. Remove assignments first."
+        )
+    
+    db.delete(mentor)
+    db.commit()
+    return None
 

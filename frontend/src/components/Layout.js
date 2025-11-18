@@ -20,6 +20,10 @@ import PeopleIcon from '@mui/icons-material/People';
 import HistoryIcon from '@mui/icons-material/History';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import PersonIcon from '@mui/icons-material/Person';
+import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import EventIcon from '@mui/icons-material/Event';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 
@@ -27,9 +31,12 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Courses', icon: <SchoolIcon />, path: '/courses' },
+  { text: 'Planning Courses', icon: <EventIcon />, path: '/courses/planning' },
+  { text: 'Ongoing Courses', icon: <PlayCircleIcon />, path: '/courses/ongoing' },
+  { text: 'Completed Courses', icon: <CheckCircleIcon />, path: '/courses/completed' },
   { text: 'Employees', icon: <PeopleIcon />, path: '/users' },
   { text: 'Previous Employees', icon: <HistoryIcon />, path: '/previous-employees' },
+  { text: 'Mentors', icon: <PersonIcon />, path: '/mentors' },
 ];
 
 function Layout({ children }) {
@@ -58,7 +65,10 @@ function Layout({ children }) {
         {menuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
-              selected={location.pathname === item.path}
+              selected={
+                location.pathname === item.path || 
+                (item.path.startsWith('/courses/') && location.pathname.startsWith('/courses/'))
+              }
               onClick={() => {
                 navigate(item.path);
                 setMobileOpen(false);

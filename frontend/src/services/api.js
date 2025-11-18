@@ -67,13 +67,24 @@ export const enrollmentsAPI = {
 };
 
 export const coursesAPI = {
-  getAll: (params) => api.get('/courses', { params }),
+  getAll: (params) => api.get('/courses/', { params }), // Use trailing slash to avoid redirect
   getById: (id) => api.get(`/courses/${id}`),
   create: (data) => api.post('/courses', data),
   update: (id, data) => api.put(`/courses/${id}`, data),
-  archive: (id) => api.post(`/courses/${id}/archive`),
   delete: (id) => api.delete(`/courses/${id}`),
   generateReport: (id) => api.get(`/courses/${id}/report`, { responseType: 'blob' }),
+  updateCosts: (id, data) => api.put(`/courses/${id}/costs`, data),
+  assignMentor: (id, data) => api.post(`/courses/${id}/mentors`, data),
+  removeCourseMentor: (courseId, courseMentorId) => api.delete(`/courses/${courseId}/mentors/${courseMentorId}`),
+  // Comment endpoints
+  addComment: (courseId, data) => api.post(`/courses/${courseId}/comments`, data),
+  getComments: (courseId) => api.get(`/courses/${courseId}/comments`),
+  // Draft endpoints
+  saveDraft: (courseId, data) => api.post(`/courses/${courseId}/draft`, data),
+  updateDraft: (courseId, data) => api.put(`/courses/${courseId}/draft`, data),
+  getDraft: (courseId) => api.get(`/courses/${courseId}/draft`),
+  // Approval endpoint
+  approveCourse: (courseId, approvedBy) => api.post(`/courses/${courseId}/approve`, null, { params: { approved_by: approvedBy } }),
 };
 
 export const studentsAPI = {
@@ -86,6 +97,8 @@ export const studentsAPI = {
   remove: (id) => api.post(`/students/${id}/remove`),
   restore: (id) => api.post(`/students/${id}/restore`),
   generateOverallReport: () => api.get('/students/report/overall', { responseType: 'blob' }),
+  tagAsMentor: (id) => api.post(`/students/${id}/mentor-tag`),
+  removeMentorTag: (id) => api.delete(`/students/${id}/mentor-tag`),
   importExcel: (file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -100,6 +113,16 @@ export const studentsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+};
+
+export const mentorsAPI = {
+  getAll: (type = 'all') => api.get('/mentors', { params: { type } }),
+  createExternal: (data) => api.post('/mentors', data),
+  createInternal: (studentId) => api.post(`/mentors/internal/${studentId}`),
+  getById: (id) => api.get(`/mentors/${id}`),
+  update: (id, data) => api.put(`/mentors/${id}`, data),
+  getStats: (id) => api.get(`/mentors/${id}/stats`),
+  delete: (id) => api.delete(`/mentors/${id}`),
 };
 
 export const importsAPI = {

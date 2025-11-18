@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 from app.models.student import SBU
 
 class StudentCreate(BaseModel):
@@ -10,6 +10,8 @@ class StudentCreate(BaseModel):
     sbu: SBU
     designation: Optional[str] = None
     experience_years: int = 0
+    career_start_date: Optional[date] = None
+    bs_joining_date: Optional[date] = None
 
 class StudentResponse(BaseModel):
     id: int
@@ -19,6 +21,8 @@ class StudentResponse(BaseModel):
     sbu: SBU
     designation: Optional[str]
     experience_years: int
+    career_start_date: Optional[date] = None
+    bs_joining_date: Optional[date] = None
     created_at: datetime
     updated_at: datetime
     

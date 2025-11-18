@@ -27,8 +27,11 @@ import {
   InputAdornment,
   Autocomplete,
 } from '@mui/material';
-import { ExpandMore, ExpandLess, PersonAdd, UploadFile, Visibility, PersonRemove, Search, Download, Description } from '@mui/icons-material';
-import { studentsAPI } from '../services/api';
+import { ExpandMore, ExpandLess, PersonAdd, UploadFile, Visibility, PersonRemove, Search, Download, Description, School } from '@mui/icons-material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { studentsAPI, mentorsAPI } from '../services/api';
 import UserDetailsDialog from '../components/UserDetailsDialog';
 
 function Users() {
@@ -53,6 +56,8 @@ function Users() {
     sbu: 'IT',
     designation: '',
     experience_years: 0,
+    career_start_date: null,
+    bs_joining_date: null,
   });
   const [message, setMessage] = useState(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -60,6 +65,28 @@ function Users() {
   const [importLoading, setImportLoading] = useState(false);
   const [importResults, setImportResults] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [mentorStatuses, setMentorStatuses] = useState({}); // Track mentor status per user
+  const [updatingMentorStatus, setUpdatingMentorStatus] = useState({});
+  const [filterMentorStatus, setFilterMentorStatus] = useState(''); // Filter: '', 'mentor', 'not_mentor'
+  
+  // Calculate experience from dates
+  const calculateTotalExperience = (careerStartDate) => {
+    if (!careerStartDate) return null;
+    const start = new Date(careerStartDate);
+    const today = new Date();
+    const diffTime = Math.abs(today - start);
+    const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+    return diffYears.toFixed(1);
+  };
+
+  const calculateBSExperience = (bsJoiningDate) => {
+    if (!bsJoiningDate) return null;
+    const start = new Date(bsJoiningDate);
+    const today = new Date();
+    const diffTime = Math.abs(today - start);
+    const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+    return diffYears.toFixed(1);
+  };
   
   // Sample preview data from employee_data_101_200.xlsx
   const previewData = [
@@ -72,7 +99,45 @@ function Users() {
 
   useEffect(() => {
     fetchUsers();
+    fetchMentorStatuses();
   }, [selectedSBU, filterNeverTaken]);
+
+  const fetchMentorStatuses = async () => {
+    try {
+      const response = await mentorsAPI.getAll('internal');
+      const mentorMap = {};
+      response.data.forEach(mentor => {
+        if (mentor.student_id) {
+          mentorMap[mentor.student_id] = true;
+        }
+      });
+      setMentorStatuses(mentorMap);
+    } catch (error) {
+      console.error('Error fetching mentor statuses:', error);
+    }
+  };
+
+  const handleToggleMentorTag = async (userId) => {
+    const isCurrentlyMentor = mentorStatuses[userId] || false;
+    setUpdatingMentorStatus({ ...updatingMentorStatus, [userId]: true });
+    
+    try {
+      if (isCurrentlyMentor) {
+        await studentsAPI.removeMentorTag(userId);
+        setMentorStatuses({ ...mentorStatuses, [userId]: false });
+        setMessage({ type: 'success', text: 'Mentor tag removed successfully' });
+      } else {
+        await studentsAPI.tagAsMentor(userId);
+        setMentorStatuses({ ...mentorStatuses, [userId]: true });
+        setMessage({ type: 'success', text: 'User tagged as mentor successfully' });
+      }
+      await fetchMentorStatuses(); // Refresh mentor statuses
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error updating mentor tag' });
+    } finally {
+      setUpdatingMentorStatus({ ...updatingMentorStatus, [userId]: false });
+    }
+  };
 
   // Filter users based on search query and filters
   const users = useMemo(() => {
@@ -84,6 +149,14 @@ function Users() {
     } else if (filterNeverTaken === 'no') {
       filtered = filtered.filter(user => user.never_taken_course === false);
     }
+    
+    // Filter by mentor status
+    if (filterMentorStatus === 'mentor') {
+      filtered = filtered.filter(user => mentorStatuses[user.id] === true);
+    } else if (filterMentorStatus === 'not_mentor') {
+      filtered = filtered.filter(user => !mentorStatuses[user.id] || mentorStatuses[user.id] === false);
+    }
+    // If filterMentorStatus is empty string, show all
     
     // Filter by search query if provided (only if not using autocomplete selection)
     if (searchQuery.trim() && !selectedSearchUser) {
@@ -99,7 +172,7 @@ function Users() {
     }
     
     return filtered;
-  }, [allUsers, filterNeverTaken, searchQuery, selectedSearchUser]);
+  }, [allUsers, filterNeverTaken, filterMentorStatus, mentorStatuses, searchQuery, selectedSearchUser]);
 
   // Update count when filtered users change
   useEffect(() => {
@@ -165,6 +238,8 @@ function Users() {
       student_employee_id: user.employee_id,
       student_designation: user.designation,
       student_experience_years: user.experience_years,
+      student_career_start_date: user.career_start_date,
+      student_bs_joining_date: user.bs_joining_date,
     };
     setSelectedUser(mockEnrollment);
     setUserDetailsOpen(true);
@@ -172,7 +247,13 @@ function Users() {
 
   const handleCreateStudent = async () => {
     try {
-      await studentsAPI.create(newStudent);
+      // Format dates for API
+      const studentData = {
+        ...newStudent,
+        career_start_date: newStudent.career_start_date ? newStudent.career_start_date.toISOString().split('T')[0] : null,
+        bs_joining_date: newStudent.bs_joining_date ? newStudent.bs_joining_date.toISOString().split('T')[0] : null,
+      };
+      await studentsAPI.create(studentData);
       setMessage({ type: 'success', text: 'Student created successfully' });
       setCreateDialogOpen(false);
       setNewStudent({
@@ -182,6 +263,8 @@ function Users() {
         sbu: 'IT',
         designation: '',
         experience_years: 0,
+        career_start_date: null,
+        bs_joining_date: null,
       });
       await fetchUsers();
     } catch (error) {
@@ -491,6 +574,34 @@ function Users() {
               <MenuItem value="yes">Never Taken a Course</MenuItem>
               <MenuItem value="no">Has Taken Courses</MenuItem>
             </TextField>
+            <TextField
+              select
+              label="Mentor Status"
+              value={filterMentorStatus}
+              onChange={(e) => setFilterMentorStatus(e.target.value)}
+              sx={{ minWidth: 200 }}
+              size="small"
+            >
+              <MenuItem value="">All Employees</MenuItem>
+              <MenuItem value="mentor">Mentors</MenuItem>
+              <MenuItem value="not_mentor">Not Mentors</MenuItem>
+            </TextField>
+            {(selectedSBU || filterNeverTaken || filterMentorStatus || searchQuery) && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setSelectedSBU('');
+                  setFilterNeverTaken('');
+                  setFilterMentorStatus('');
+                  setSearchQuery('');
+                  setSelectedSearchUser(null);
+                }}
+                sx={{ alignSelf: 'flex-start', mt: 0.5 }}
+              >
+                Clear Filters
+              </Button>
+            )}
           </Box>
         </CardContent>
       </Card>
@@ -517,6 +628,7 @@ function Users() {
                   <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Mentor</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Course History</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Remove</TableCell>
                 </TableRow>
@@ -573,6 +685,17 @@ function Users() {
                       </TableCell>
                       <TableCell>{user.designation || '-'}</TableCell>
                       <TableCell>
+                        <Chip
+                          icon={<School />}
+                          label={mentorStatuses[user.id] ? 'Mentor' : 'Not Mentor'}
+                          color={mentorStatuses[user.id] ? 'primary' : 'default'}
+                          size="small"
+                          onClick={() => handleToggleMentorTag(user.id)}
+                          disabled={updatingMentorStatus[user.id]}
+                          sx={{ cursor: 'pointer' }}
+                        />
+                      </TableCell>
+                      <TableCell>
                         <Box display="flex" alignItems="center" gap={1}>
                           <IconButton
                             size="small"
@@ -606,7 +729,7 @@ function Users() {
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
                         <Collapse in={expandedUser === user.id} timeout="auto" unmountOnExit>
                           <Box sx={{ margin: 2 }}>
                             <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
@@ -857,6 +980,22 @@ function Users() {
               onChange={(e) => setNewStudent({ ...newStudent, experience_years: parseInt(e.target.value) || 0 })}
               fullWidth
             />
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                label="Career Start Date"
+                value={newStudent.career_start_date}
+                onChange={(date) => setNewStudent({ ...newStudent, career_start_date: date })}
+                slotProps={{ textField: { fullWidth: true } }}
+              />
+              <Box sx={{ mt: 2 }}>
+                <DatePicker
+                  label="BS Joining Date"
+                  value={newStudent.bs_joining_date}
+                  onChange={(date) => setNewStudent({ ...newStudent, bs_joining_date: date })}
+                  slotProps={{ textField: { fullWidth: true } }}
+                />
+              </Box>
+            </LocalizationProvider>
           </Box>
         </DialogContent>
         <DialogActions>
