@@ -117,12 +117,12 @@ function CourseDetail() {
   const [importLoading, setImportLoading] = useState(false);
   const [showImportPreview, setShowImportPreview] = useState(false);
   
-  // Preview data for enrollment import format
+  // Preview data for enrollment import format (matches ADA2025A_registration.xlsx structure)
   const enrollmentPreviewData = [
-    { employee_id: 'EMP001', name: 'John Doe', email: 'john.doe@company.com', sbu: 'IT', designation: 'Manager', career_start_date: '15 Jan 2020', bs_join_date: '20 Mar 2021' },
-    { employee_id: 'EMP002', name: 'Jane Smith', email: 'jane.smith@company.com', sbu: 'HR', designation: 'Employee', career_start_date: '10 Feb 2019', bs_join_date: '15 Apr 2020' },
-    { employee_id: 'EMP003', name: 'Bob Wilson', email: 'bob.wilson@company.com', sbu: 'Finance', designation: 'Director', career_start_date: '05 Mar 2018', bs_join_date: '12 May 2019' },
-    { employee_id: 'EMP004', name: 'Alice Brown', email: 'alice.brown@company.com', sbu: 'Operations', designation: 'Coordinator', career_start_date: '20 Apr 2021', bs_join_date: '25 Jun 2022' },
+    { employee_id: 'EMP143', name: 'Casey Smith', email: 'casey.smith143@company.com', sbu: 'Operations', designation: 'Engineer', course_name: 'Advanced Data Analytics', batch_code: 'ADA2025A' },
+    { employee_id: 'EMP102', name: 'Morgan Williams', email: 'morgan.williams102@company.com', sbu: 'Marketing', designation: 'Engineer', course_name: 'Advanced Data Analytics', batch_code: 'ADA2025A' },
+    { employee_id: 'EMP144', name: 'Reese Williams', email: 'reese.williams144@company.com', sbu: 'Operations', designation: 'Manager', course_name: 'Advanced Data Analytics', batch_code: 'ADA2025A' },
+    { employee_id: 'EMP145', name: 'Alex Johnson', email: 'alex.johnson145@company.com', sbu: 'IT', designation: 'Coordinator', course_name: 'Advanced Data Analytics', batch_code: 'ADA2025A' },
   ];
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
   const [attendanceFile, setAttendanceFile] = useState(null);
@@ -1730,17 +1730,17 @@ function CourseDetail() {
                     Download Template
                   </Button>
                 </Box>
-                <TableContainer>
-                  <Table size="small" sx={{ minWidth: 650 }}>
+                <TableContainer sx={{ maxHeight: 400, overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 1000 }}>
                     <TableHead>
                       <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>employee_id</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>name</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>email</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>sbu</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>designation</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>career_start_date</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>bs_join_date</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>employee_id</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>name</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>email</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>sbu</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>designation</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>course_name</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>batch_code</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1751,15 +1751,15 @@ function CourseDetail() {
                             '&:nth-of-type(odd)': { backgroundColor: alpha(theme.palette.primary.main, 0.02) }
                           }}
                         >
-                          <TableCell sx={{ fontSize: '0.75rem' }}>{row.employee_id}</TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem' }}>{row.name}</TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem' }}>{row.email}</TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem' }}>
+                          <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.employee_id}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.name}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.email}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
                             <Chip label={row.sbu} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                           </TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem' }}>{row.designation}</TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem' }}>{row.career_start_date || 'N/A'}</TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem' }}>{row.bs_join_date || 'N/A'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.designation}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.course_name}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.batch_code}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

@@ -74,11 +74,11 @@ function Users() {
   
   // Sample preview data from employee_data_101_200.xlsx
   const previewData = [
-    { employee_id: 'EMP101', name: 'Cameron Williams', email: 'cameron.williams101@company.com', sbu: 'IT', designation: 'Coordinator' },
-    { employee_id: 'EMP102', name: 'Morgan Williams', email: 'morgan.williams102@company.com', sbu: 'Marketing', designation: 'Engineer' },
-    { employee_id: 'EMP103', name: 'Morgan Moore', email: 'morgan.moore103@company.com', sbu: 'Finance', designation: 'Coordinator' },
-    { employee_id: 'EMP104', name: 'Casey Miller', email: 'casey.miller104@company.com', sbu: 'Operations', designation: 'Coordinator' },
-    { employee_id: 'EMP105', name: 'Alex Jones', email: 'alex.jones105@company.com', sbu: 'HR', designation: 'Manager' },
+    { employee_id: 'EMP101', name: 'Cameron Williams', email: 'cameron.williams101@company.com', sbu: 'Support', designation: 'Coordinator', career_start_date: '11-01-2021', bs_join_date: '12-02-2022' },
+    { employee_id: 'EMP102', name: 'Morgan Williams', email: 'morgan.williams102@company.com', sbu: 'Marketing', designation: 'Engineer', career_start_date: '12-01-2022', bs_join_date: '12-02-2023' },
+    { employee_id: 'EMP103', name: 'Morgan Moore', email: 'morgan.moore103@company.com', sbu: 'Finance', designation: 'Coordinator', career_start_date: '11-01-2018', bs_join_date: '13-08-2019' },
+    { employee_id: 'EMP104', name: 'Casey Miller', email: 'casey.miller104@company.com', sbu: 'Marketing', designation: 'Coordinator', career_start_date: '11-01-2019', bs_join_date: '13-08-2020' },
+    { employee_id: 'EMP105', name: 'Alex Jones', email: 'alex.jones105@company.com', sbu: 'HR', designation: 'Manager', career_start_date: '15-03-2020', bs_join_date: '20-05-2021' },
   ];
 
   useEffect(() => {
@@ -1053,15 +1053,17 @@ function Users() {
                       Download Template
                     </Button>
                   </Box>
-                  <TableContainer>
-                    <Table size="small" sx={{ minWidth: 650 }}>
+                  <TableContainer sx={{ maxHeight: 400, overflowX: 'auto' }}>
+                    <Table size="small" sx={{ minWidth: 1000 }}>
                       <TableHead>
                         <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>employee_id</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>name</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>email</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>sbu</TableCell>
-                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem' }}>designation</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>employee_id</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>name</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>email</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>sbu</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>designation</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>career_start_date</TableCell>
+                          <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>bs_join_date</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1072,13 +1074,15 @@ function Users() {
                               '&:nth-of-type(odd)': { backgroundColor: alpha(theme.palette.primary.main, 0.02) }
                             }}
                           >
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.employee_id}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.name}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.email}</TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>
+                            <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.employee_id}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.name}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.email}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
                               <Chip label={row.sbu} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                             </TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem' }}>{row.designation}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.designation}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.career_start_date || 'N/A'}</TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{row.bs_join_date || 'N/A'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1087,7 +1091,7 @@ function Users() {
                   <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                       <strong>Note:</strong> Column names are case-insensitive. SBU values: IT, HR, Finance, Operations, Sales, Marketing, Other. 
-                      Designation is an optional field.
+                      Optional fields: designation, career_start_date, bs_join_date (or bs_joining_date). Date format: DD-MM-YYYY or YYYY-MM-DD.
                     </Typography>
                   </Box>
                 </Box>
