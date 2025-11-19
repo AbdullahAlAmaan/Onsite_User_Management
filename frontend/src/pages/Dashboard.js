@@ -286,20 +286,42 @@ function Dashboard() {
       const classesToday = [];
       const events = [];
       
+      // Generate unique color for each course based on course ID
+      const generateCourseColor = (courseId, courseStatus) => {
+        // Use a hash function to generate consistent colors per course
+        const hash = courseId.toString().split('').reduce((acc, char) => {
+          return char.charCodeAt(0) + ((acc << 5) - acc);
+        }, 0);
+        
+        // Generate hue based on course ID (0-360)
+        const hue = Math.abs(hash) % 360;
+        
+        // Adjust saturation and lightness based on status for better visibility
+        let saturation = 70;
+        let lightness = 50;
+        
+        if (courseStatus === 'ongoing') {
+          lightness = 45; // Darker for ongoing courses
+        } else if (courseStatus === 'completed') {
+          saturation = 60;
+          lightness = 55; // Lighter for completed courses
+        } else {
+          lightness = 50; // Planning courses
+        }
+        
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+      };
+
       // Convert class schedules to FullCalendar events
       allCourses.forEach(course => {
         const courseStatus = getCourseStatus(course);
         
-        // Determine color based on course status
-        let eventColor = theme.palette.info.main; // Planning - blue
-        if (courseStatus === 'ongoing') {
-          eventColor = theme.palette.success.main; // Ongoing - green
-        } else if (courseStatus === 'completed') {
-          eventColor = theme.palette.warning.main; // Completed - orange
-        }
+        // Generate unique color for this course
+        const eventColor = generateCourseColor(course.id, courseStatus);
         
         if (course.class_schedule && Array.isArray(course.class_schedule)) {
-          course.class_schedule.forEach(schedule => {
+          // Handle multiple schedules for the same course
+          course.class_schedule.forEach((schedule, scheduleIndex) => {
             // Get today's classes for the simple list
             if (schedule.day === todayDayName) {
               classesToday.push({
@@ -327,7 +349,7 @@ function Dashboard() {
             
             const dayOfWeek = dayMap[schedule.day];
             if (dayOfWeek !== undefined && schedule.start_time && schedule.end_time) {
-              // Create events for the next 3 months
+              // Create events for the next 12 weeks
               const startDate = new Date();
               startDate.setDate(startDate.getDate() - startDate.getDay()); // Start of current week
               
@@ -349,9 +371,18 @@ function Dashboard() {
                   const eventEnd = new Date(eventDate);
                   eventEnd.setHours(endHour, endMin, 0, 0);
                   
+                  // Create unique ID for each class instance (handles same course, same day, multiple classes)
+                  // Format: course-{id}-{day}-{scheduleIndex}-{week}-{time}
+                  const eventId = `course-${course.id}-${schedule.day}-${scheduleIndex}-${week}-${schedule.start_time.replace(':', '')}`;
+                  
+                  // Build title - include time if multiple classes on same day
+                  const title = course.class_schedule.filter(s => s.day === schedule.day).length > 1
+                    ? `${course.name} (${course.batch_code}) - ${schedule.start_time}`
+                    : `${course.name} (${course.batch_code})`;
+                  
                   events.push({
-                    id: `course-${course.id}-${schedule.day}-${week}`,
-                    title: `${course.name} (${course.batch_code})`,
+                    id: eventId,
+                    title: title,
                     start: eventStart.toISOString(),
                     end: eventEnd.toISOString(),
                     backgroundColor: eventColor,
@@ -363,6 +394,8 @@ function Dashboard() {
                       batchCode: course.batch_code,
                       status: courseStatus,
                       time: `${schedule.start_time} - ${schedule.end_time}`,
+                      day: schedule.day,
+                      scheduleIndex: scheduleIndex,
                     },
                   });
                 }
@@ -758,9 +791,21 @@ function Dashboard() {
                   fontSize: '0.75rem',
                   padding: '2px 4px',
                   marginBottom: '2px',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    opacity: 0.9,
+                    transform: 'scale(1.02)',
+                    transition: 'all 0.2s ease',
+                  },
                 },
                 '& .fc-event-title': {
                   fontSize: '0.75rem',
+                  fontWeight: 500,
+                },
+                '& .fc-event-overlap': {
+                  borderLeftWidth: '4px',
+                  borderLeftStyle: 'solid',
+                  borderLeftColor: theme.palette.error.main,
                 },
               }}>
                 <FullCalendar

@@ -1166,7 +1166,7 @@ function CourseDetail() {
                     </Grid>
                     
                     {/* Class Schedule inside Timeline */}
-                    {course.class_schedule && course.class_schedule.length > 0 && (
+                    {course.class_schedule && course.class_schedule.length > 0 ? (
                       <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
                         <Box display="flex" alignItems="center" gap={1} mb={1.5}>
                           <AccessTime fontSize="small" color="primary" />
@@ -1185,6 +1185,55 @@ function CourseDetail() {
                               size="small"
                             />
                           ))}
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            borderRadius: 1, 
+                            backgroundColor: alpha(theme.palette.warning.main, 0.08),
+                            border: `1px dashed ${alpha(theme.palette.warning.main, 0.3)}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                          }}
+                        >
+                          <AccessTime fontSize="small" color="warning" />
+                          <Box flexGrow={1}>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, mb: 0.5 }}>
+                              No Class Schedule Set
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Click "Edit Course Details" above to add class schedule times
+                            </Typography>
+                          </Box>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<Edit />}
+                            onClick={() => {
+                              setEditCourseData({
+                                start_date: course.start_date ? new Date(course.start_date) : null,
+                                end_date: course.end_date ? new Date(course.end_date) : null,
+                                seat_limit: course.seat_limit || 0,
+                                total_classes_offered: course.total_classes_offered || '',
+                              });
+                              setEditClassSchedule([]);
+                              setEditCourseDialogOpen(true);
+                            }}
+                            sx={{ 
+                              borderColor: theme.palette.warning.main,
+                              color: theme.palette.warning.main,
+                              '&:hover': {
+                                borderColor: theme.palette.warning.dark,
+                                backgroundColor: alpha(theme.palette.warning.main, 0.1),
+                              },
+                            }}
+                          >
+                            Add Schedule
+                          </Button>
                         </Box>
                       </Box>
                     )}
