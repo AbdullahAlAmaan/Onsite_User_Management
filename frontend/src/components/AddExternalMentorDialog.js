@@ -206,11 +206,12 @@ function AddExternalMentorDialog({ open, onClose, onAdd, isDraft = false }) {
         {isDraft}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button onClick={handleClose} sx={{ textTransform: 'uppercase' }}>Cancel</Button>
         <Button 
           onClick={handleAdd} 
           variant="contained" 
           disabled={loading || !isValid}
+          sx={{ textTransform: 'uppercase' }}
         >
           {loading ? <CircularProgress size={20} /> : 'Create & Assign'}
         </Button>

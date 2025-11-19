@@ -62,6 +62,7 @@ import {
   Visibility,
   ExpandMore,
   ExpandLess,
+  Comment,
 } from '@mui/icons-material';
 import {
   coursesAPI,
@@ -74,7 +75,7 @@ import {
 import UserDetailsDialog from '../components/UserDetailsDialog';
 import AssignInternalMentorDialog from '../components/AssignInternalMentorDialog';
 import AddExternalMentorDialog from '../components/AddExternalMentorDialog';
-import { formatDateTimeForDisplay, formatDateForAPI } from '../utils/dateUtils';
+import { formatDateTimeForDisplay, formatDateForAPI, formatDateForDisplay, formatDateRangeWithFromTo, convertTo12HourFormat } from '../utils/dateUtils';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -850,6 +851,34 @@ function CourseDetail() {
     }
   };
 
+  const handleGenerateReport = async () => {
+    try {
+      const response = await coursesAPI.generateReport(courseId);
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `course_report_${courseId}.xlsx`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      setMessage({ type: 'success', text: 'Report generated and downloaded successfully' });
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error generating report' });
+    }
+  };
+
   // Get mentors to display (combine official and draft for draft courses)
   const getDisplayMentors = () => {
     if (course?.status === 'draft') {
@@ -926,371 +955,326 @@ function CourseDetail() {
   }
 
   return (
-    <Box>
-      <Box display="flex" alignItems="center" gap={2} mb={3}>
-        <IconButton onClick={() => navigate('/courses')}>
-          <ArrowBack />
-        </IconButton>
-        <Box flexGrow={1}>
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>
-            {course.name} - {course.batch_code}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Course Details and Enrollment Management
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Enrollment Action Buttons */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-            {course?.status === 'draft' && (
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<CheckCircle />}
-                onClick={handleApproveCourse}
-                sx={{ fontWeight: 600 }}
-              >
-                Approve Course
-              </Button>
-            )}
-            <Button
-              variant="contained"
-              startIcon={<PersonAdd />}
-              onClick={handleOpenManualEnroll}
-            >
-              Manual Enrollment
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<UploadFile />}
-              onClick={() => setImportDialogOpen(true)}
-            >
-              Import Enrollments
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<UploadFile />}
-              onClick={() => setAttendanceDialogOpen(true)}
-            >
-              Upload Attendance & Scores
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
+    <Box sx={{ p: 3 }}>
+      <Button
+        startIcon={<ArrowBack />}
+        onClick={() => navigate('/courses')}
+        sx={{
+          mb: 3,
+          textTransform: 'none',
+          fontSize: '1rem',
+          color: theme.palette.primary.main,
+          '&:hover': {
+            backgroundColor: alpha(theme.palette.primary.main, 0.08),
+          },
+        }}
+      >
+        Back to Courses
+      </Button>
 
       {message && (
         <Alert 
-          severity={message.type} 
-          sx={{ mb: 3 }} 
+          severity={message.type}
           onClose={() => setMessage(null)}
+          sx={{ 
+            mb: 3,
+            borderRadius: '8px',
+            border: 'none',
+          }} 
         >
           {message.text}
         </Alert>
       )}
 
-      {/* Course Details Card */}
-      <Card sx={{ 
-        mb: 3,
-        borderRadius: 3,
-        boxShadow: 3,
-        overflow: 'hidden',
-      }}>
-        {/* Header Section with Gradient */}
-        <Box
-          sx={{
-            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-            p: 3,
-            color: 'white',
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={2} mb={1}>
-            <School sx={{ fontSize: 32 }} />
-            <Box flexGrow={1}>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-                {course.name}
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                Batch Code: {course.batch_code}
-              </Typography>
-            </Box>
-          </Box>
-          {course.description && (
-            <Typography variant="body2" sx={{ mt: 2, opacity: 0.9, fontStyle: 'italic' }}>
-              {course.description}
-            </Typography>
-          )}
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+          <CircularProgress />
         </Box>
-
-        <CardContent sx={{ p: 3 }}>
-          {/* Key Metrics Row */}
-          <Grid container spacing={2} sx={{ mb: 4 }}>
-            {[
-              {
-                label: 'Enrollment',
-                value: `${course.current_enrolled}/${course.seat_limit}`,
-                helper: course.seat_limit
-                  ? `${Math.min(100, Math.round((course.current_enrolled / course.seat_limit) * 100))}% seats filled`
-                  : 'Seat limit not set',
-                icon: <People color="primary" />,
-                border: alpha(theme.palette.primary.main, 0.2),
-              },
-              {
-                label: 'Classes',
-                value: course.total_classes_offered || 'N/A',
-                helper: 'Total sessions planned',
-                icon: <Event color="success" />,
-                border: alpha(theme.palette.success.main, 0.2),
-              },
-              {
-                label: 'Mentors',
-                value: course.mentors?.length || 0,
-                helper: 'Assigned mentors',
-                icon: <Person color="info" />,
-                border: alpha(theme.palette.info.main, 0.2),
-              },
-              {
-                label: 'Total Cost',
-                value: `Tk ${formatCurrency(calculateTotalTrainingCost())}`,
-                helper: 'Training cost',
-                icon: <AccountBalance color="warning" />,
-                border: alpha(theme.palette.warning.main, 0.2),
-              },
-            ].map((metric) => (
-              <Grid item xs={12} sm={6} md={3} key={metric.label}>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    height: '100%',
-                    borderRadius: 2,
-                    borderColor: metric.border,
-                  }}
-                >
-                  <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      {metric.icon}
-                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                        {metric.label}
-                      </Typography>
-                    </Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {metric.value}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {metric.helper}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-
-          {/* Course Information Section */}
-          <Box sx={{ mb: 4 }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <CalendarToday color="primary" />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Course Schedule
-                </Typography>
+      ) : (
+        <Box>
+          {/* Header Card with Gradient */}
+          <Card
+            sx={{
+              mb: 3,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.info.main} 100%)`,
+              color: 'white',
+              boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.15)}`,
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Box display="flex" alignItems="center" gap={2} mb={1.5}>
+                <School sx={{ fontSize: 40 }} />
+                <Box flexGrow={1}>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                    {course?.name}
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.95, fontSize: '1rem' }}>
+                    Batch Code: {course?.batch_code}
+                  </Typography>
+                </Box>
               </Box>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Edit />}
-                onClick={() => {
-                  setEditCourseData({
-                    start_date: course.start_date ? new Date(course.start_date) : null,
-                    end_date: course.end_date ? new Date(course.end_date) : null,
-                    seat_limit: course.seat_limit || 0,
-                    total_classes_offered: course.total_classes_offered || '',
-                  });
-                  setEditClassSchedule(course.class_schedule || []);
-                  setEditCourseDialogOpen(true);
+              {course?.description && (
+                <Typography variant="body2" sx={{ mt: 2, opacity: 0.9, fontStyle: 'italic', fontSize: '0.95rem' }}>
+                  {course.description}
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Stat Cards */}
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card
+                sx={{
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                  height: '100%',
                 }}
               >
-                Edit Course Details
-              </Button>
-            </Box>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 600 }}>
-                      Timeline
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <People sx={{ fontSize: 20, color: theme.palette.primary.main }} />
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Enrollment
                     </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="caption" color="text.secondary">
-                          Start Date
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          {course.start_date}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="caption" color="text.secondary">
-                          End Date
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          {course.end_date || 'Not set'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="caption" color="text.secondary">
-                          Status
-                        </Typography>
-                        <Chip
-                          label={course.status?.toUpperCase()}
-                          color={
-                            course.status === 'completed'
-                              ? 'success'
-                              : course.status === 'ongoing'
-                              ? 'primary'
-                              : 'warning'
-                          }
-                          sx={{ mt: 0.5, fontWeight: 600 }}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="caption" color="text.secondary">
-                          Total Classes
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          {course.total_classes_offered || 'N/A'}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                    
-                    {/* Class Schedule inside Timeline */}
-                    {course.class_schedule && course.class_schedule.length > 0 ? (
-                      <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-                        <Box display="flex" alignItems="center" gap={1} mb={1.5}>
-                          <AccessTime fontSize="small" color="primary" />
-                          <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                            Class Schedule
-                          </Typography>
-                        </Box>
-                        <Box display="flex" flexWrap="wrap" gap={1}>
-                          {course.class_schedule.map((schedule, index) => (
-                            <Chip
-                              key={`${schedule.day}-${index}`}
-                              label={`${schedule.day} ${schedule.start_time} - ${schedule.end_time}`}
-                              color="primary"
-                              variant="outlined"
-                              sx={{ fontWeight: 500 }}
-                              size="small"
-                            />
-                          ))}
-                        </Box>
-                      </Box>
-                    ) : (
-                      <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-                        <Box 
-                          sx={{ 
-                            p: 2, 
-                            borderRadius: 1, 
-                            backgroundColor: alpha(theme.palette.warning.main, 0.08),
-                            border: `1px dashed ${alpha(theme.palette.warning.main, 0.3)}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.5,
-                          }}
-                        >
-                          <AccessTime fontSize="small" color="warning" />
-                          <Box flexGrow={1}>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, mb: 0.5 }}>
-                              No Class Schedule Set
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Click "Edit Course Details" above to add class schedule times
-                            </Typography>
-                          </Box>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<Edit />}
-                            onClick={() => {
-                              setEditCourseData({
-                                start_date: course.start_date ? new Date(course.start_date) : null,
-                                end_date: course.end_date ? new Date(course.end_date) : null,
-                                seat_limit: course.seat_limit || 0,
-                                total_classes_offered: course.total_classes_offered || '',
-                              });
-                              setEditClassSchedule([]);
-                              setEditCourseDialogOpen(true);
-                            }}
-                            sx={{ 
-                              borderColor: theme.palette.warning.main,
-                              color: theme.palette.warning.main,
-                              '&:hover': {
-                                borderColor: theme.palette.warning.dark,
-                                backgroundColor: alpha(theme.palette.warning.main, 0.1),
-                              },
-                            }}
-                          >
-                            Add Schedule
-                          </Button>
-                        </Box>
-                      </Box>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
+                  </Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700, color: theme.palette.primary.main, mb: 0.5 }}>
+                    {course?.current_enrolled}/{course?.seat_limit}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {course?.seat_limit ? `${Math.min(100, Math.round((course.current_enrolled / course.seat_limit) * 100))}% filled` : 'No limit set'}
+                  </Typography>
+                </CardContent>
+              </Card>
             </Grid>
-          </Box>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card
+                sx={{
+                  border: `1px solid ${alpha(theme.palette.success.main, 0.15)}`,
+                  backgroundColor: alpha(theme.palette.success.main, 0.05),
+                  height: '100%',
+                }}
+              >
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <Event sx={{ fontSize: 20, color: theme.palette.success.main }} />
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Classes
+                    </Typography>
+                  </Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700, color: theme.palette.success.main, mb: 0.5 }}>
+                    {course?.total_classes_offered || 'N/A'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Total sessions planned
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card
+                sx={{
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}`,
+                  backgroundColor: alpha(theme.palette.warning.main, 0.05),
+                  height: '100%',
+                }}
+              >
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <CalendarToday sx={{ fontSize: 20, color: theme.palette.warning.main }} />
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Status
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={course?.status?.toUpperCase()}
+                    color={
+                      course?.status === 'completed'
+                        ? 'success'
+                        : course?.status === 'ongoing'
+                        ? 'primary'
+                        : 'warning'
+                    }
+                    sx={{ fontWeight: 600 }}
+                  />
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card
+                sx={{
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.15)}`,
+                  backgroundColor: alpha(theme.palette.info.main, 0.05),
+                  height: '100%',
+                }}
+              >
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <AccessTime sx={{ fontSize: 20, color: theme.palette.info.main }} />
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Duration
+                    </Typography>
+                  </Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.info.main, mb: 0.5, fontSize: '0.95rem' }}>
+                    {formatDateRangeWithFromTo(course?.start_date, course?.end_date)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
 
-          {/* Assigned Mentors Section */}
-          <Divider sx={{ my: 3 }} />
-          <Box sx={{ mb: 3 }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} flexWrap="wrap" gap={2}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <Person color="primary" />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Assigned Mentors
-                  {course?.status === 'draft' && (
-                    <Chip 
-                      label="Draft" 
-                      size="small" 
-                      color="warning"
-                      sx={{ ml: 1, fontSize: '0.7rem' }}
-                    />
-                  )}
-                </Typography>
-                {(() => {
-                  const displayMentors = getDisplayMentors();
-                  return displayMentors.length > 0 && (
-                    <Chip 
-                      label={displayMentors.length} 
-                      size="small" 
+          {/* Action Buttons */}
+          <Card sx={{ mb: 3, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
+            <CardContent>
+              <Box display="flex" gap={2} flexWrap="wrap">
+                {course?.status === 'draft' && (
+                  <Button
+                    variant="contained"
+                    color="success"
+                    startIcon={<CheckCircle />}
+                    onClick={handleApproveCourse}
+                    sx={{ fontWeight: 600 }}
+                  >
+                    Approve Course
+                  </Button>
+                )}
+                <Button
+                  variant="contained"
+                  startIcon={<PersonAdd />}
+                  onClick={handleOpenManualEnroll}
+                  sx={{
+                    background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.25)',
+                  }}
+                >
+                  Manual Enrollment
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<UploadFile />}
+                  onClick={() => setImportDialogOpen(true)}
+                  sx={{
+                    background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.25)',
+                  }}
+                >
+                  Import Enrollments
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<UploadFile />}
+                  onClick={() => setAttendanceDialogOpen(true)}
+                  sx={{
+                    background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.25)',
+                  }}
+                >
+                  Upload Attendance & Scores
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<Download />}
+                  onClick={handleGenerateReport}
+                  sx={{
+                    background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.25)',
+                  }}
+                >
+                  Generate Report
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Course Schedule Card */}
+          <Card sx={{ mb: 3, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={2.5}>
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  <CalendarToday color="primary" sx={{ fontSize: 24 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Course Schedule
+                  </Typography>
+                </Box>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  startIcon={<Edit />}
+                  onClick={() => {
+                    setEditCourseData({
+                      start_date: course.start_date ? new Date(course.start_date) : null,
+                      end_date: course.end_date ? new Date(course.end_date) : null,
+                      seat_limit: course.seat_limit || 0,
+                      total_classes_offered: course.total_classes_offered || '',
+                    });
+                    setEditClassSchedule(course.class_schedule || []);
+                    setEditCourseDialogOpen(true);
+                  }}
+                >
+                  Edit Details
+                </Button>
+              </Box>
+              <Divider sx={{ mb: 2.5 }} />
+              
+              {course?.class_schedule && course.class_schedule.length > 0 ? (
+                <Box display="flex" flexWrap="wrap" gap={2}>
+                  {course.class_schedule.map((schedule, index) => (
+                    <Chip
+                      key={`${schedule.day}-${index}`}
+                      label={`${schedule.day} ${convertTo12HourFormat(schedule.start_time)} - ${convertTo12HourFormat(schedule.end_time)}`}
                       color="primary"
-                      sx={{ ml: 1 }}
+                      variant="outlined"
+                      sx={{ fontWeight: 500, p: 2 }}
                     />
-                  );
-                })()}
+                  ))}
+                </Box>
+              ) : (
+                <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                  No class schedule set. Click "Edit Details" to add schedule times.
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Assigned Mentors Card */}
+          <Card sx={{ mb: 3, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={2.5} flexWrap="wrap" gap={2}>
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  <Person color="primary" sx={{ fontSize: 24 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Assigned Mentors
+                  </Typography>
+                </Box>
+                <Box display="flex" gap={1}>
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    startIcon={<Add />}
+                    onClick={handleOpenAssignMentor}
+                  >
+                    Assign Internal
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    size="small" 
+                    startIcon={<Add />}
+                    onClick={() => setAddExternalMentorDialogOpen(true)}
+                  >
+                    Add External
+                  </Button>
+                </Box>
               </Box>
-              <Box display="flex" gap={1} flexWrap="wrap">
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<Add />}
-                  onClick={handleOpenAssignMentor}
-                >
-                  Assign Internal Mentor
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<Add />}
-                  onClick={() => setAddExternalMentorDialogOpen(true)}
-                >
-                  Add External Mentor
-                </Button>
-              </Box>
-            </Box>
+              <Divider sx={{ mb: 2.5 }} />
+              
             {(() => {
               const displayMentors = getDisplayMentors();
               return displayMentors.length > 0 ? (
@@ -1418,313 +1402,321 @@ function CourseDetail() {
                 </Box>
               );
             })()}
-          </Box>
+            </CardContent>
+          </Card>
 
           {/* Course Costs Section - Accounting Books Layout */}
-          <Divider sx={{ my: 3 }} />
-          <Box>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} flexWrap="wrap" gap={2}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <AccountBalance color="primary" />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Course Costs Breakdown
-                </Typography>
+          <Card sx={{ mb: 3, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={2.5} flexWrap="wrap" gap={2}>
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  <AccountBalance color="primary" sx={{ fontSize: 24 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Course Costs Breakdown
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Edit />}
+                  onClick={handleOpenEditCosts}
+                >
+                  Edit Costs
+                </Button>
               </Box>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Edit />}
-                onClick={handleOpenEditCosts}
-              >
-                Edit Costs
-              </Button>
-            </Box>
-            
-            {/* Accounting Books Layout - Stacked vertically */}
-            <Card variant="outlined" sx={{ borderRadius: 2 }}>
-              <CardContent sx={{ p: 0 }}>
-                {/* Total Mentor Costs */}
-                <Box
-                  sx={{
-                    p: 2.5,
-                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Person color="primary" sx={{ fontSize: 24 }} />
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      Total Mentor Costs
-                    </Typography>
-                  </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                    Tk {calculateTotalMentorCost().toFixed(2)}
-                  </Typography>
-                </Box>
-                
-                {/* Food Cost */}
-                <Box
-                  sx={{
-                    p: 2.5,
-                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Restaurant color="success" sx={{ fontSize: 24 }} />
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      Food Cost
-                    </Typography>
-                  </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main' }}>
-                    Tk {parseFloat((course?.status === 'draft' && course?.draft?.food_cost !== null && course?.draft?.food_cost !== undefined) 
-                      ? course.draft.food_cost 
-                      : (course?.food_cost || 0)).toFixed(2)}
-                  </Typography>
-                </Box>
-                
-                {/* Other Cost */}
-                <Box
-                  sx={{
-                    p: 2.5,
-                    borderBottom: `2px solid ${theme.palette.primary.main}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Receipt color="info" sx={{ fontSize: 24 }} />
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      Other Cost
-                    </Typography>
-                  </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'info.main' }}>
-                    Tk {parseFloat((course?.status === 'draft' && course?.draft?.other_cost !== null && course?.draft?.other_cost !== undefined) 
-                      ? course.draft.other_cost 
-                      : (course?.other_cost || 0)).toFixed(2)}
-                  </Typography>
-                </Box>
-                
-                {/* Total Training Cost - Final Sum */}
-                <Box
-                  sx={{
-                    p: 3,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Calculate color="primary" sx={{ fontSize: 28 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                      Total Training Cost
-                    </Typography>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                    Tk {calculateTotalTrainingCost().toFixed(2)}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-        </CardContent>
-      </Card>
-
-      {/* Comment History Section */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Comment/Update History
-            </Typography>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setCommentDialogOpen(true)}
-            >
-              Add Comment
-            </Button>
-          </Box>
-          {comments.length > 0 ? (
-            <List>
-              {comments.map((comment) => (
-                <ListItem
-                  key={comment.id}
-                  sx={{
-                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                    py: 2,
-                  }}
-                >
-                  <ListItemText
-                    primary={
-                      <Box display="flex" alignItems="center" gap={1} mb={1}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {comment.created_by}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDateTimeForDisplay(comment.created_at)}
-                        </Typography>
-                      </Box>
-                    }
-                    secondary={
-                      <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        {comment.comment}
+              <Divider sx={{ mb: 2.5 }} />
+              
+              {/* Accounting Books Layout - Stacked vertically */}
+              <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                <CardContent sx={{ p: 0 }}>
+                  {/* Total Mentor Costs */}
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Person color="primary" sx={{ fontSize: 24 }} />
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        Total Mentor Costs
                       </Typography>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
+                    </Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                      Tk {calculateTotalMentorCost().toFixed(2)}
+                    </Typography>
+                  </Box>
+                  
+                  {/* Food Cost */}
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Restaurant color="success" sx={{ fontSize: 24 }} />
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        Food Cost
+                      </Typography>
+                    </Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main' }}>
+                      Tk {parseFloat((course?.status === 'draft' && course?.draft?.food_cost !== null && course?.draft?.food_cost !== undefined) 
+                        ? course.draft.food_cost 
+                        : (course?.food_cost || 0)).toFixed(2)}
+                    </Typography>
+                  </Box>
+                  
+                  {/* Other Cost */}
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      borderBottom: `2px solid ${theme.palette.primary.main}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Receipt color="info" sx={{ fontSize: 24 }} />
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        Other Cost
+                      </Typography>
+                    </Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'info.main' }}>
+                      Tk {parseFloat((course?.status === 'draft' && course?.draft?.other_cost !== null && course?.draft?.other_cost !== undefined) 
+                        ? course.draft.other_cost 
+                        : (course?.other_cost || 0)).toFixed(2)}
+                    </Typography>
+                  </Box>
+                  
+                  {/* Total Training Cost - Final Sum */}
+                  <Box
+                    sx={{
+                      p: 3,
+                      backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Calculate color="primary" sx={{ fontSize: 28 }} />
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                        Total Training Cost
+                      </Typography>
+                    </Box>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                      Tk {calculateTotalTrainingCost().toFixed(2)}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </CardContent>
+          </Card>
+
+          {/* Comment History Section */}
+          <Card sx={{ mb: 3, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={2.5}>
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  <Comment color="primary" sx={{ fontSize: 24 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Comment/Update History
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() => setCommentDialogOpen(true)}
+                >
+                  Add Comment
+                </Button>
+              </Box>
+              <Divider sx={{ mb: 2.5 }} />
+              {comments.length > 0 ? (
+                <List>
+                  {comments.map((comment) => (
+                    <ListItem
+                      key={comment.id}
+                      sx={{
+                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                        py: 2,
+                      }}
+                    >
+                      <ListItemText
+                        primary={
+                          <Box display="flex" alignItems="center" gap={1} mb={1}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {comment.created_by}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatDateTimeForDisplay(comment.created_at)}
+                            </Typography>
+                          </Box>
+                        }
+                        secondary={
+                          <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            {comment.comment}
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                  No comments yet. Add the first comment to track updates.
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Enrollment Sections */}
+          {loadingEnrollments ? (
+            <Box display="flex" justifyContent="center" p={3}>
+              <CircularProgress />
+            </Box>
           ) : (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-              No comments yet. Add the first comment to track updates.
-            </Typography>
-          )}
-        </CardContent>
-      </Card>
+            <>
+              {/* Approved/Enrolled Students */}
+              {approvedEnrollments.length > 0 && (
+                <Card sx={{ 
+                  mb: 3,
+                  borderLeft: `4px solid ${theme.palette.primary.main}`,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.02),
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.primary.main }}>
+                      Approved/Enrolled Students ({approvedEnrollments.length})
+                    </Typography>
+                    <EnrollmentTable
+                      enrollments={approvedEnrollments}
+                      onViewDetails={(e) => {
+                        setSelectedUserEnrollment(e);
+                        setUserDetailsOpen(true);
+                      }}
+                      onEditAttendance={(e) => {
+                        setSelectedEnrollmentForEdit(e);
+                        setEditClassesAttended(e.present?.toString() || '');
+                        setEditScore(e.score?.toString() || '');
+                        setEditAttendanceDialogOpen(true);
+                      }}
+                      onWithdraw={handleWithdraw}
+                      showActions={true}
+                    />
+                  </CardContent>
+                </Card>
+              )}
 
-      {/* Enrollment Sections */}
-      {loadingEnrollments ? (
-        <Box display="flex" justifyContent="center" p={3}>
-          <CircularProgress />
+              {/* Eligible Pending */}
+              {eligiblePending.length > 0 && (
+                <Card sx={{ 
+                  mb: 3,
+                  borderLeft: `4px solid ${theme.palette.success.main}`,
+                  backgroundColor: alpha(theme.palette.success.main, 0.02),
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.success.main }}>
+                      Eligible Enrollments (Pending) ({eligiblePending.length})
+                    </Typography>
+                    <EnrollmentTable
+                      enrollments={eligiblePending}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                      showActions={true}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Not Eligible */}
+              {notEligible.length > 0 && (
+                <Card sx={{ 
+                  mb: 3,
+                  borderLeft: `4px solid ${theme.palette.error.main}`,
+                  backgroundColor: alpha(theme.palette.error.main, 0.02),
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.error.main }}>
+                      Not Eligible Enrollments ({notEligible.length})
+                    </Typography>
+                    <EnrollmentTable
+                      enrollments={notEligible}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                      showEligibilityReason={true}
+                      showActions={true}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Rejected */}
+              {rejected.length > 0 && (
+                <Card sx={{ 
+                  mb: 3,
+                  borderLeft: `4px solid ${theme.palette.error.main}`,
+                  backgroundColor: alpha(theme.palette.error.main, 0.02),
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.error.main }}>
+                      Rejected Enrollments ({rejected.length})
+                    </Typography>
+                    <EnrollmentTable
+                      enrollments={rejected}
+                      onViewDetails={(e) => {
+                        setSelectedUserEnrollment(e);
+                        setUserDetailsOpen(true);
+                      }}
+                      onReapprove={handleReapprove}
+                      showActions={true}
+                      actionsHeaderText="Add"
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Withdrawn */}
+              {withdrawn.length > 0 && (
+                <Card sx={{ 
+                  mb: 3,
+                  borderLeft: `4px solid ${theme.palette.warning.main}`,
+                  backgroundColor: alpha(theme.palette.warning.main, 0.02),
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.warning.main }}>
+                      Withdrawn Students ({withdrawn.length})
+                    </Typography>
+                    <EnrollmentTable
+                      enrollments={withdrawn}
+                      onReapprove={handleReapprove}
+                      showActions={true}
+                      actionsHeaderText="Add"
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {enrollments.length === 0 && (
+                <Card>
+                  <CardContent>
+                    <Typography variant="body2" color="text.secondary" align="center" py={3}>
+                      No enrollments yet. Use "Import Enrollments" or "Manual Enrollment" to add students.
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
         </Box>
-      ) : (
-        <>
-          {/* Approved/Enrolled Students */}
-          {approvedEnrollments.length > 0 && (
-            <Card sx={{ 
-              mb: 3,
-              borderLeft: `4px solid ${theme.palette.primary.main}`,
-              backgroundColor: alpha(theme.palette.primary.main, 0.02),
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.primary.main }}>
-                  Approved/Enrolled Students ({approvedEnrollments.length})
-                </Typography>
-                <EnrollmentTable
-                  enrollments={approvedEnrollments}
-                  onViewDetails={(e) => {
-                    setSelectedUserEnrollment(e);
-                    setUserDetailsOpen(true);
-                  }}
-                  onEditAttendance={(e) => {
-                    setSelectedEnrollmentForEdit(e);
-                    setEditClassesAttended(e.present?.toString() || '');
-                    setEditScore(e.score?.toString() || '');
-                    setEditAttendanceDialogOpen(true);
-                  }}
-                  onWithdraw={handleWithdraw}
-                  showActions={true}
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Eligible Pending */}
-          {eligiblePending.length > 0 && (
-            <Card sx={{ 
-              mb: 3,
-              borderLeft: `4px solid ${theme.palette.success.main}`,
-              backgroundColor: alpha(theme.palette.success.main, 0.02),
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.success.main }}>
-                  Eligible Enrollments (Pending) ({eligiblePending.length})
-                </Typography>
-                <EnrollmentTable
-                  enrollments={eligiblePending}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  showActions={true}
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Not Eligible */}
-          {notEligible.length > 0 && (
-            <Card sx={{ 
-              mb: 3,
-              borderLeft: `4px solid ${theme.palette.error.main}`,
-              backgroundColor: alpha(theme.palette.error.main, 0.02),
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.error.main }}>
-                  Not Eligible Enrollments ({notEligible.length})
-                </Typography>
-                <EnrollmentTable
-                  enrollments={notEligible}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  showEligibilityReason={true}
-                  showActions={true}
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Rejected */}
-          {rejected.length > 0 && (
-            <Card sx={{ 
-              mb: 3,
-              borderLeft: `4px solid ${theme.palette.error.main}`,
-              backgroundColor: alpha(theme.palette.error.main, 0.02),
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.error.main }}>
-                  Rejected Enrollments ({rejected.length})
-                </Typography>
-                <EnrollmentTable
-                  enrollments={rejected}
-                  onViewDetails={(e) => {
-                    setSelectedUserEnrollment(e);
-                    setUserDetailsOpen(true);
-                  }}
-                  onReapprove={handleReapprove}
-                  showActions={true}
-                  actionsHeaderText="Add"
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Withdrawn */}
-          {withdrawn.length > 0 && (
-            <Card sx={{ 
-              mb: 3,
-              borderLeft: `4px solid ${theme.palette.warning.main}`,
-              backgroundColor: alpha(theme.palette.warning.main, 0.02),
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: theme.palette.warning.main }}>
-                  Withdrawn Students ({withdrawn.length})
-                </Typography>
-                <EnrollmentTable
-                  enrollments={withdrawn}
-                  onReapprove={handleReapprove}
-                  showActions={true}
-                  actionsHeaderText="Add"
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {enrollments.length === 0 && (
-            <Card>
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" align="center" py={3}>
-                  No enrollments yet. Use "Import Enrollments" or "Manual Enrollment" to add students.
-                </Typography>
-              </CardContent>
-            </Card>
-          )}
-        </>
       )}
 
       {/* Dialogs */}
@@ -2235,7 +2227,13 @@ function CourseDetail() {
               <DatePicker
                 label="Start Date"
                 value={editCourseData.start_date}
-                onChange={(newValue) => setEditCourseData({ ...editCourseData, start_date: newValue })}
+                onChange={(newValue) => {
+                  setEditCourseData({ ...editCourseData, start_date: newValue });
+                  // If end date is before new start date, clear it
+                  if (editCourseData.end_date && newValue && editCourseData.end_date < newValue) {
+                    setEditCourseData(prev => ({ ...prev, end_date: null }));
+                  }
+                }}
                 slotProps={{
                   textField: {
                     fullWidth: true,
@@ -2246,10 +2244,22 @@ function CourseDetail() {
               <DatePicker
                 label="End Date"
                 value={editCourseData.end_date}
-                onChange={(newValue) => setEditCourseData({ ...editCourseData, end_date: newValue })}
+                onChange={(newValue) => {
+                  // Validate that end date is not before start date
+                  if (newValue && editCourseData.start_date && newValue < editCourseData.start_date) {
+                    setMessage({ type: 'error', text: 'End date cannot be before start date' });
+                    return;
+                  }
+                  setEditCourseData({ ...editCourseData, end_date: newValue });
+                }}
+                minDate={editCourseData.start_date || undefined}
                 slotProps={{
                   textField: {
                     fullWidth: true,
+                    error: editCourseData.end_date && editCourseData.start_date && editCourseData.end_date < editCourseData.start_date,
+                    helperText: editCourseData.end_date && editCourseData.start_date && editCourseData.end_date < editCourseData.start_date 
+                      ? 'End date cannot be before start date' 
+                      : '',
                   },
                 }}
               />
@@ -2370,6 +2380,12 @@ function CourseDetail() {
             onClick={async () => {
               if (!editCourseData.start_date || editCourseData.seat_limit <= 0) {
                 setMessage({ type: 'error', text: 'Please fill in all required fields' });
+                return;
+              }
+              
+              // Validate that end date is not before start date
+              if (editCourseData.end_date && editCourseData.start_date && editCourseData.end_date < editCourseData.start_date) {
+                setMessage({ type: 'error', text: 'End date cannot be before start date' });
                 return;
               }
               

@@ -29,7 +29,20 @@ def get_mentors(
     # else "all" - no filter
     
     mentors = query.order_by(Mentor.name.asc()).all()
-    return [MentorResponse.from_orm(mentor) for mentor in mentors]
+    
+    # Build response with course count
+    result = []
+    for mentor in mentors:
+        course_count = db.query(func.count(CourseMentor.id)).filter(
+            CourseMentor.mentor_id == mentor.id
+        ).scalar() or 0
+        
+        # Create response object and add course_count
+        mentor_dict = MentorResponse.model_validate(mentor).model_dump()
+        mentor_dict['course_count'] = course_count
+        result.append(MentorResponse(**mentor_dict))
+    
+    return result
 
 @router.post("/", response_model=MentorResponse, status_code=201)
 def create_external_mentor(mentor: MentorCreate, db: Session = Depends(get_db)):

@@ -153,11 +153,12 @@ function AssignInternalMentorDialog({ open, onClose, onAssign, isDraft = false }
         {isDraft}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button onClick={handleClose} sx={{ textTransform: 'uppercase' }}>Cancel</Button>
         <Button 
           onClick={handleAssign} 
           variant="contained" 
           disabled={loading || !selectedEmployeeId || !mentorHours || !mentorAmount}
+          sx={{ textTransform: 'uppercase' }}
         >
           {loading ? <CircularProgress size={20} /> : 'Assign'}
         </Button>

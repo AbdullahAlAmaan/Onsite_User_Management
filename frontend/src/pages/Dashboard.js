@@ -37,7 +37,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { studentsAPI, coursesAPI, enrollmentsAPI } from '../services/api';
 import { getCourseStatus } from '../utils/courseUtils';
-import { formatDateRange as formatDateRangeUtil, formatDateForDisplay } from '../utils/dateUtils';
+import { formatDateRange as formatDateRangeUtil, formatDateForDisplay, convertTo12HourFormat } from '../utils/dateUtils';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -377,7 +377,7 @@ function Dashboard() {
                   
                   // Build title - include time if multiple classes on same day
                   const title = course.class_schedule.filter(s => s.day === schedule.day).length > 1
-                    ? `${course.name} (${course.batch_code}) - ${schedule.start_time}`
+                    ? `${course.name} (${course.batch_code}) - ${convertTo12HourFormat(schedule.start_time)}`
                     : `${course.name} (${course.batch_code})`;
                   
                   events.push({
@@ -393,7 +393,7 @@ function Dashboard() {
                       courseName: course.name,
                       batchCode: course.batch_code,
                       status: courseStatus,
-                      time: `${schedule.start_time} - ${schedule.end_time}`,
+                      time: `${convertTo12HourFormat(schedule.start_time)} - ${convertTo12HourFormat(schedule.end_time)}`,
                       day: schedule.day,
                       scheduleIndex: scheduleIndex,
                     },
@@ -449,8 +449,15 @@ function Dashboard() {
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          border: `2px solid ${alpha(color, 0.2)}`,
-          background: `linear-gradient(135deg, ${alpha(color, 0.1)} 0%, ${alpha(color, 0.05)} 100%)`,
+          border: `1px solid ${alpha(color, 0.15)}`,
+          background: `linear-gradient(135deg, ${alpha(color, 0.08)} 0%, ${alpha(color, 0.02)} 100%)`,
+          boxShadow: `0 4px 16px ${alpha(color, 0.1)}`,
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          '&:hover': {
+            boxShadow: `0 8px 24px ${alpha(color, 0.15)}`,
+            transform: 'translateY(-2px)',
+            border: `1px solid ${alpha(color, 0.25)}`,
+          },
         }}
       >
         <CardContent sx={{ flexGrow: 1 }}>
@@ -459,11 +466,11 @@ function Dashboard() {
               <Typography variant="h4" sx={{ fontWeight: 700, color: color, mb: 0.5 }}>
                 {value}
               </Typography>
-              <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 500 }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 500, fontSize: '0.95rem' }}>
                 {title}
               </Typography>
               {subtitle && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', fontSize: '0.8rem' }}>
                   {subtitle}
                 </Typography>
               )}
@@ -472,7 +479,7 @@ function Dashboard() {
               sx={{
                 p: 1.5,
                 borderRadius: 2,
-                backgroundColor: alpha(color, 0.15),
+                backgroundColor: alpha(color, 0.12),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -486,7 +493,7 @@ function Dashboard() {
               display="flex" 
               alignItems="center" 
               color={color} 
-              sx={{ mt: 2, cursor: 'pointer' }}
+              sx={{ mt: 2, cursor: 'pointer', fontSize: '0.9rem' }}
               onClick={onClick}
             >
               <Typography variant="body2" sx={{ fontWeight: 600, mr: 0.5 }}>
@@ -497,7 +504,7 @@ function Dashboard() {
           )}
         </CardContent>
         {showCourses && (
-          <Box sx={{ borderTop: `1px solid ${alpha(color, 0.2)}`, maxHeight: 300, overflow: 'auto' }}>
+          <Box sx={{ borderTop: `1px solid ${alpha(color, 0.15)}`, maxHeight: 300, overflow: 'auto' }}>
             <List dense sx={{ py: 0 }}>
               {courses.slice(0, 10).map((course) => (
                 <ListItem key={course.id} disablePadding>
@@ -505,7 +512,7 @@ function Dashboard() {
                     onClick={() => navigate(`/courses/${course.id}`)}
                     sx={{
                       '&:hover': {
-                        backgroundColor: alpha(color, 0.1),
+                        backgroundColor: alpha(color, 0.08),
                       },
                     }}
                   >
@@ -548,16 +555,15 @@ function Dashboard() {
   }
 
   return (
-    <Box>
-      {/* Header */}
-      <Box mb={4} display="flex" justifyContent="space-between" alignItems="center">
+    <Box sx={{ p: 3 }}>
+      <Box mb={4} display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
         <Box>
           <Typography
             variant="h4"
             gutterBottom
             sx={{
               fontWeight: 700,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.info.main} 100%)`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
@@ -565,7 +571,7 @@ function Dashboard() {
           >
             Dashboard
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: '0.95rem' }}>
             Overview of your enrollment management system
           </Typography>
         </Box>
@@ -675,18 +681,19 @@ function Dashboard() {
         <Grid item xs={12}>
           <Card
             sx={{
-              border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.04)} 0%, ${alpha(theme.palette.info.main, 0.04)} 100%)`,
+              boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.08)}`,
             }}
           >
             <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
                 <Box display="flex" alignItems="center" gap={2}>
                   <Box
                     sx={{
                       p: 1.5,
                       borderRadius: 2,
-                      backgroundColor: alpha(theme.palette.primary.main, 0.15),
+                      backgroundColor: alpha(theme.palette.primary.main, 0.12),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -699,16 +706,16 @@ function Dashboard() {
                       Class Schedule Calendar
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      View all scheduled classes across all courses
+                      View all scheduled classes
                     </Typography>
                   </Box>
                 </Box>
-                <Box display="flex" gap={1}>
+                <Box display="flex" gap={1} flexWrap="wrap">
                   <Chip
                     label="Planning"
                     size="small"
                     sx={{
-                      backgroundColor: alpha(theme.palette.info.main, 0.2),
+                      backgroundColor: alpha(theme.palette.info.main, 0.15),
                       color: theme.palette.info.main,
                       fontWeight: 600,
                       border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
@@ -718,7 +725,7 @@ function Dashboard() {
                     label="Ongoing"
                     size="small"
                     sx={{
-                      backgroundColor: alpha(theme.palette.success.main, 0.2),
+                      backgroundColor: alpha(theme.palette.success.main, 0.15),
                       color: theme.palette.success.main,
                       fontWeight: 600,
                       border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
@@ -728,7 +735,7 @@ function Dashboard() {
                     label="Completed"
                     size="small"
                     sx={{
-                      backgroundColor: alpha(theme.palette.warning.main, 0.2),
+                      backgroundColor: alpha(theme.palette.warning.main, 0.15),
                       color: theme.palette.warning.main,
                       fontWeight: 600,
                       border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
@@ -747,6 +754,7 @@ function Dashboard() {
                 },
                 '& .fc-toolbar-title': {
                   fontSize: '1.25rem !important',
+                  fontWeight: 600,
                 },
                 '& .fc-button': {
                   backgroundColor: theme.palette.primary.main,

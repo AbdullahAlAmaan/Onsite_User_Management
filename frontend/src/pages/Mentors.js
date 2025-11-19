@@ -34,9 +34,14 @@ import {
   Add, 
   School, 
   Search,
+  PersonRemove,
+  Delete,
 } from '@mui/icons-material';
-import { mentorsAPI, studentsAPI } from '../services/api';
+import { mentorsAPI } from '../services/api';
 import MentorDetailsDialog from '../components/MentorDetailsDialog';
+import AssignInternalMentorDialog from '../components/AssignInternalMentorDialog';
+import AddExternalMentorDialog from '../components/AddExternalMentorDialog';
+import { formatDateForDisplay } from '../utils/dateUtils';
 
 function Mentors() {
   const theme = useTheme();
@@ -55,20 +60,11 @@ function Mentors() {
   // Search functionality
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSearchMentor, setSelectedSearchMentor] = useState(null);
+  const [filterNoCourseHistory, setFilterNoCourseHistory] = useState(false);
   
   // Add mentor dialogs
   const [addInternalMentorDialogOpen, setAddInternalMentorDialogOpen] = useState(false);
   const [addExternalMentorDialogOpen, setAddExternalMentorDialogOpen] = useState(false);
-  const [students, setStudents] = useState([]);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [externalMentorData, setExternalMentorData] = useState({
-    name: '',
-    email: '',
-    sbu: '',
-    designation: '',
-  });
-  const [creatingMentor, setCreatingMentor] = useState(false);
   
 
   useEffect(() => {
@@ -108,78 +104,33 @@ function Mentors() {
     }
   };
 
-  const handleOpenAddInternalMentor = async () => {
-    setLoadingStudents(true);
+  const handleAssignInternalMentor = async (assignment) => {
     try {
-      const response = await studentsAPI.getAll({ limit: 1000 });
-      const existingMentorStudentIds = new Set(mentors.filter(m => m.is_internal && m.student_id).map(m => m.student_id));
-      const availableStudents = response.data.filter(s => !existingMentorStudentIds.has(s.id));
-      setStudents(availableStudents);
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      setMessage({ type: 'error', text: 'Error fetching students' });
-    } finally {
-      setLoadingStudents(false);
-    }
-    setSelectedStudentId('');
-    setAddInternalMentorDialogOpen(true);
-  };
-
-  const handleCreateInternalMentor = async () => {
-    if (!selectedStudentId) {
-      setMessage({ type: 'error', text: 'Please select a student' });
-      return;
-    }
-    setCreatingMentor(true);
-    try {
-      await mentorsAPI.createInternal(parseInt(selectedStudentId));
+      // In the Mentors tab, we just create the mentor (the dialog already handles creation)
+      // The assignment object contains mentor_id, hours_taught, and amount_paid
+      // But since we're not assigning to a course here, we just need to refresh the list
       setMessage({ type: 'success', text: 'Internal mentor created successfully' });
       setAddInternalMentorDialogOpen(false);
-      setSelectedStudentId('');
       fetchMentors();
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Error creating internal mentor' });
-    } finally {
-      setCreatingMentor(false);
+      throw error; // Re-throw so dialog can handle it
     }
   };
 
-  const handleCreateExternalMentor = async () => {
-    if (!externalMentorData.name.trim()) {
-      setMessage({ type: 'error', text: 'Name is required' });
-      return;
-    }
-    setCreatingMentor(true);
+  const handleAddExternalMentor = async (assignment) => {
     try {
-      const payload = {
-        is_internal: false,
-        name: externalMentorData.name.trim(),
-        student_id: null,
-      };
-      
-      if (externalMentorData.email && externalMentorData.email.trim()) {
-        payload.email = externalMentorData.email.trim();
-      }
-      
-      if (externalMentorData.sbu) {
-        payload.sbu = externalMentorData.sbu;
-      }
-      
-      if (externalMentorData.designation && externalMentorData.designation.trim()) {
-        payload.designation = externalMentorData.designation.trim();
-      }
-      
-      await mentorsAPI.createExternal(payload);
+      // In the Mentors tab, we just create the mentor (the dialog already handles creation)
+      // The assignment object contains mentor_id, hours_taught, and amount_paid
+      // But since we're not assigning to a course here, we just need to refresh the list
       setMessage({ type: 'success', text: 'External mentor created successfully' });
       setAddExternalMentorDialogOpen(false);
-      setExternalMentorData({ name: '', email: '', company: '', designation: '' });
       fetchMentors();
     } catch (error) {
       console.error('Error creating external mentor:', error);
       const errorMessage = error.response?.data?.detail || error.message || 'Error creating external mentor';
       setMessage({ type: 'error', text: errorMessage });
-    } finally {
-      setCreatingMentor(false);
+      throw error; // Re-throw so dialog can handle it
     }
   };
 
@@ -201,6 +152,11 @@ function Mentors() {
       filtered = filtered.filter(m => m.sbu === selectedSBU);
     }
     
+    // Filter by course history
+    if (filterNoCourseHistory) {
+      filtered = filtered.filter(m => !m.course_count || m.course_count === 0);
+    }
+    
     // Filter by search query
     if (searchQuery.trim() && !selectedSearchMentor) {
       const query = searchQuery.toLowerCase().trim();
@@ -217,98 +173,102 @@ function Mentors() {
     }
     
     return filtered;
-  }, [mentors, selectedType, selectedSBU, searchQuery, selectedSearchMentor]);
+  }, [mentors, selectedType, selectedSBU, searchQuery, selectedSearchMentor, filterNoCourseHistory]);
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Box>
-          <Typography 
-            variant="h4" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 600,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
-            Mentors
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Manage internal and external mentors
-          </Typography>
-        </Box>
-        <Box display="flex" gap={2}>
-          <Button
-            variant="outlined"
-            startIcon={<Add />}
-            onClick={handleOpenAddInternalMentor}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-            }}
-          >
-            Add Internal Mentor
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setAddExternalMentorDialogOpen(true)}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-            }}
-          >
-            Add External Mentor
-          </Button>
+    <Box sx={{ minHeight: '100vh', background: `linear-gradient(135deg, ${alpha('#1e40af', 0.03)} 0%, ${alpha('#059669', 0.03)} 100%)` }}>
+      {/* Modern header with gradient */}
+      <Box sx={{ mb: 4, pt: 2 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography 
+              variant="h3" 
+              sx={{ 
+                fontWeight: 700,
+                color: '#1e40af',
+                mb: 1,
+                letterSpacing: '-0.02em',
+              }}
+            >
+               Mentors
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.95rem' }}>
+              Manage internal and external mentors
+            </Typography>
+          </Box>
+          <Box display="flex" gap={2}>
+            <Button
+              variant="outlined"
+              startIcon={<Add />}
+              onClick={() => setAddInternalMentorDialogOpen(true)}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 600,
+                color: '#1e40af',
+                borderColor: '#1e40af',
+                '&:hover': { background: alpha('#1e40af', 0.05) },
+              }}
+            >
+              Add Internal
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setAddExternalMentorDialogOpen(true)}
+              sx={{
+                background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                boxShadow: '0 4px 12px rgba(30, 64, 175, 0.25)',
+              }}
+            >
+              Add External
+            </Button>
+          </Box>
         </Box>
       </Box>
 
       {message && (
         <Alert 
-          severity={message.type} 
+          severity={message.type}
+          onClose={() => setMessage(null)}
           sx={{ 
             mb: 3,
-            borderRadius: 2,
-            boxShadow: `0 4px 12px ${alpha(theme.palette[message.type === 'success' ? 'success' : 'error'].main, 0.15)}`,
+            borderRadius: '8px',
+            border: 'none',
           }} 
-          onClose={() => setMessage(null)}
         >
           {message.text}
         </Alert>
       )}
 
+      {/* Filter section with modern design */}
       <Card
         sx={{
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          border: '1px solid rgba(30, 64, 175, 0.1)',
           mb: 3,
-          borderRadius: 3,
-          boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+          background: '#ffffff',
         }}
       >
-        <CardContent>
-          <Box display="flex" gap={2} flexWrap="wrap">
+        <CardContent sx={{ p: 3 }}>
+          <Box display="flex" gap={2} flexWrap="wrap" alignItems="flex-end">
             <Autocomplete
               options={mentors}
-              getOptionLabel={(option) => option ? `${option.name}${option.email ? ` - ${option.email}` : ''}${option.student?.employee_id ? ` (${option.student.employee_id})` : ''}` : ''}
+              getOptionLabel={(option) => option ? `${option.name}${option.email ? ` - ${option.email}` : ''}` : ''}
               value={selectedSearchMentor}
               onChange={(event, newValue) => {
                 setSelectedSearchMentor(newValue);
-                if (newValue) {
-                  setSearchQuery(newValue.name || '');
-                } else {
-                  setSearchQuery('');
-                }
+                if (newValue) setSearchQuery(newValue.name || '');
+                else setSearchQuery('');
               }}
               onInputChange={(event, newInputValue) => {
                 setSearchQuery(newInputValue);
-                if (!newInputValue) {
-                  setSelectedSearchMentor(null);
-                }
+                if (!newInputValue) setSelectedSearchMentor(null);
               }}
               inputValue={searchQuery}
               filterOptions={(options, { inputValue }) => {
@@ -316,26 +276,22 @@ function Mentors() {
                 const searchLower = inputValue.toLowerCase();
                 return options.filter((mentor) =>
                   mentor.name?.toLowerCase().includes(searchLower) ||
-                  mentor.email?.toLowerCase().includes(searchLower) ||
-                  mentor.designation?.toLowerCase().includes(searchLower) ||
-                  mentor.sbu?.toLowerCase().includes(searchLower) ||
-                  mentor.student?.employee_id?.toLowerCase().includes(searchLower) ||
-                  mentor.student?.name?.toLowerCase().includes(searchLower)
+                  mentor.email?.toLowerCase().includes(searchLower)
                 );
               }}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Search Mentors"
-                  placeholder="Search by name, email, designation, SBU, or employee ID..."
+                  label="Search"
+                  placeholder="Name or email..."
                   size="small"
-                  sx={{ minWidth: 300, flexGrow: 1 }}
+                  sx={{ minWidth: 280, flex: 1 }}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: (
                       <>
                         <InputAdornment position="start">
-                          <Search sx={{ color: 'text.secondary' }} />
+                          <Search sx={{ color: '#94a3b8' }} />
                         </InputAdornment>
                         {params.InputProps.startAdornment}
                       </>
@@ -343,30 +299,14 @@ function Mentors() {
                   }}
                 />
               )}
-              renderOption={(props, mentor) => (
-                <Box component="li" {...props} key={mentor.id}>
-                  <Box>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {mentor.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {mentor.is_internal ? 'Internal' : 'External'}
-                      {mentor.email ? ` • ${mentor.email}` : ''}
-                      {mentor.student?.employee_id ? ` • ${mentor.student.employee_id}` : ''}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
               noOptionsText="No mentors found"
-              clearOnEscape
-              clearOnBlur={false}
             />
             <TextField
               select
               label="Type"
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 140 }}
               size="small"
             >
               <MenuItem value="">All Mentors</MenuItem>
@@ -378,7 +318,7 @@ function Mentors() {
               label="SBU"
               value={selectedSBU}
               onChange={(e) => setSelectedSBU(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 140 }}
               size="small"
             >
               <MenuItem value="">All SBUs</MenuItem>
@@ -388,21 +328,32 @@ function Mentors() {
               <MenuItem value="Operations">Operations</MenuItem>
               <MenuItem value="Sales">Sales</MenuItem>
               <MenuItem value="Marketing">Marketing</MenuItem>
-              <MenuItem value="Other">Other</MenuItem>
             </TextField>
-            {(selectedType || selectedSBU || searchQuery) && (
+            <TextField
+              select
+              label="Course History"
+              value={filterNoCourseHistory ? 'no_history' : ''}
+              onChange={(e) => setFilterNoCourseHistory(e.target.value === 'no_history')}
+              sx={{ minWidth: 160 }}
+              size="small"
+            >
+              <MenuItem value="">All Mentors</MenuItem>
+              <MenuItem value="no_history">No Course History</MenuItem>
+            </TextField>
+            {(selectedType || selectedSBU || searchQuery || filterNoCourseHistory) && (
               <Button
-                variant="outlined"
+                variant="text"
                 size="small"
                 onClick={() => {
                   setSelectedType('');
                   setSelectedSBU('');
                   setSearchQuery('');
                   setSelectedSearchMentor(null);
+                  setFilterNoCourseHistory(false);
                 }}
-                sx={{ alignSelf: 'flex-start', mt: 0.5 }}
+                sx={{ color: '#64748b', fontWeight: 500 }}
               >
-                Clear Filters
+                Clear
               </Button>
             )}
           </Box>
@@ -410,118 +361,178 @@ function Mentors() {
       </Card>
 
       {loading ? (
-        <Box display="flex" justifyContent="center" p={3}>
-          <CircularProgress />
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress sx={{ color: '#1e40af' }} />
         </Box>
       ) : (
         <Card
           sx={{
-            borderRadius: 3,
-            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            borderRadius: '12px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+            border: '1px solid rgba(30, 64, 175, 0.1)',
             overflow: 'hidden',
+            background: '#ffffff',
           }}
         >
           <TableContainer>
             <Table>
               <TableHead>
-                <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                  <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
+                <TableRow sx={{ background: 'linear-gradient(135deg, rgba(30, 64, 175, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)' }}>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>ID</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Mentor</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>SBU</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Course History</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredMentors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography variant="body2" color="text.secondary">
+                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                      <Typography color="text.secondary">
                         No mentors found
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredMentors.map((mentor) => (
-                    <React.Fragment key={mentor.id}>
-                      <TableRow
-                        sx={{
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.03),
-                          },
-                        }}
-                      >
-                        <TableCell>
-                          {mentor.student?.employee_id ? (
-                            <Typography
-                              sx={{
-                                cursor: 'pointer',
-                                color: 'primary.main',
-                                textDecoration: 'underline',
-                                '&:hover': {
-                                  color: 'primary.dark',
-                                },
-                              }}
-                              onClick={() => handleViewDetails(mentor)}
-                            >
-                              {mentor.student.employee_id}
-                            </Typography>
-                          ) : (
+                    <TableRow
+                      key={mentor.id}
+                      sx={{
+                        borderBottom: '1px solid rgba(30, 64, 175, 0.08)',
+                        '&:hover': {
+                          background: 'linear-gradient(90deg, rgba(30, 64, 175, 0.03) 0%, rgba(5, 150, 105, 0.03) 100%)',
+                        },
+                      }}
+                    >
+                      <TableCell>
+                        {mentor.student?.employee_id ? (
+                          <Typography
+                            sx={{
+                              cursor: 'pointer',
+                              color: '#1e40af',
+                              fontWeight: 600,
+                              textDecoration: 'underline',
+                              '&:hover': {
+                                color: '#1e3a8a',
+                              },
+                            }}
+                            onClick={() => handleViewDetails(mentor)}
+                          >
+                            {mentor.student.employee_id}
+                          </Typography>
+                        ) : (
+                          <Typography sx={{ color: '#64748b' }}>
+                            {mentor.id}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography
+                          sx={{
+                            cursor: mentor.is_internal ? 'pointer' : 'default',
+                            fontWeight: 500,
+                            color: '#1e3a8a',
+                            textDecoration: mentor.is_internal ? 'underline' : 'none',
+                            '&:hover': mentor.is_internal ? {
+                              color: '#1e40af',
+                            } : {},
+                          }}
+                          onClick={() => mentor.is_internal && handleViewDetails(mentor)}
+                        >
+                          {mentor.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={mentor.is_internal ? 'Yes' : 'No'}
+                          size="small"
+                          sx={{
+                            background: mentor.is_internal 
+                              ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
+                              : 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)',
+                            color: mentor.is_internal ? '#1e40af' : '#be185d',
+                            fontWeight: 600,
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ color: '#64748b' }}>{mentor.email || '-'}</TableCell>
+                      <TableCell>
+                        {mentor.sbu ? (
+                          <Chip 
+                            label={mentor.sbu} 
+                            size="small"
+                            sx={{
+                              background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                              color: '#047857',
+                              fontWeight: 600,
+                            }}
+                          />
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {mentor.course_count > 0 ? (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleViewStats(mentor.id)}
+                            title="View Course History"
+                            sx={{ color: '#1e40af' }}
+                          >
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        ) : (
+                          <Chip
+                            label="No Course History"
+                            size="small"
+                            sx={{
+                              background: alpha('#fbbf24', 0.1),
+                              color: '#92400e',
+                              fontWeight: 500,
+                              border: `1px solid ${alpha('#fbbf24', 0.3)}`,
+                            }}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Box display="flex" gap={0.5} justifyContent="center">
+                          {mentor.course_count > 0 && (
                             <IconButton
                               size="small"
-                              color="primary"
-                              onClick={() => handleViewStats(mentor.id)}
-                              title="View Stats"
+                              onClick={() => {
+                                // TODO: Handle remove from course
+                                console.log('Remove from course:', mentor.id);
+                              }}
+                              title="Remove from Course"
+                              sx={{ color: '#dc2626' }}
                             >
-                              <Visibility />
+                              <PersonRemove fontSize="small" />
                             </IconButton>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Typography
-                              sx={{
-                                cursor: mentor.is_internal ? 'pointer' : 'default',
-                                color: mentor.is_internal ? 'primary.main' : 'inherit',
-                                textDecoration: mentor.is_internal ? 'underline' : 'none',
-                                '&:hover': mentor.is_internal ? {
-                                  color: 'primary.dark',
-                                } : {},
+                          {!mentor.is_internal && (
+                            <IconButton
+                              size="small"
+                              onClick={async () => {
+                                if (window.confirm(`Are you sure you want to delete ${mentor.name}?`)) {
+                                  try {
+                                    await mentorsAPI.delete(mentor.id);
+                                    setMessage({ type: 'success', text: 'Mentor deleted successfully' });
+                                    fetchMentors();
+                                  } catch (error) {
+                                    setMessage({ type: 'error', text: error.response?.data?.detail || 'Error deleting mentor' });
+                                  }
+                                }
                               }}
-                              onClick={() => mentor.is_internal && handleViewDetails(mentor)}
+                              title="Delete Mentor"
+                              sx={{ color: '#dc2626' }}
                             >
-                              {mentor.name}
-                            </Typography>
-                            {mentor.is_internal && (
-                              <Chip 
-                                label="Internal" 
-                                color="primary" 
-                                size="small"
-                                variant="outlined"
-                                sx={{ 
-                                  fontSize: '0.65rem',
-                                  height: 18,
-                                }}
-                              />
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={mentor.is_internal ? 'Internal' : 'External'}
-                            size="small"
-                            color={mentor.is_internal ? 'primary' : 'secondary'}
-                          />
-                        </TableCell>
-                        <TableCell>{mentor.email || '-'}</TableCell>
-                        <TableCell>
-                          {mentor.sbu ? <Chip label={mentor.sbu} size="small" /> : '-'}
-                        </TableCell>
-                        <TableCell>{mentor.designation || '-'}</TableCell>
-                      </TableRow>
-                    </React.Fragment>
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
                   ))
                 )}
               </TableBody>
@@ -622,8 +633,8 @@ function Mentors() {
                         <TableRow key={index}>
                           <TableCell>{course.course_name}</TableCell>
                           <TableCell>{course.batch_code}</TableCell>
-                          <TableCell>{course.start_date || '-'}</TableCell>
-                          <TableCell>{course.end_date || '-'}</TableCell>
+                          <TableCell>{course.start_date ? formatDateForDisplay(course.start_date) : '-'}</TableCell>
+                          <TableCell>{course.end_date ? formatDateForDisplay(course.end_date) : '-'}</TableCell>
                           <TableCell>{course.hours_taught}</TableCell>
                           <TableCell>tk {parseFloat(course.amount_paid).toFixed(2)}</TableCell>
                           <TableCell>{course.participants_count}</TableCell>
@@ -656,110 +667,21 @@ function Mentors() {
         </DialogActions>
       </Dialog>
 
-      {/* Add Internal Mentor Dialog */}
-      <Dialog 
-        open={addInternalMentorDialogOpen} 
-        onClose={() => setAddInternalMentorDialogOpen(false)} 
-        maxWidth="sm" 
-        fullWidth
-      >
-        <DialogTitle>Add Internal Mentor</DialogTitle>
-        <DialogContent>
-          {loadingStudents ? (
-            <Box display="flex" justifyContent="center" p={3}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Autocomplete
-              options={students}
-              getOptionLabel={(option) => `${option.name} (${option.employee_id})`}
-              value={students.find(s => s.id.toString() === selectedStudentId) || null}
-              onChange={(event, newValue) => setSelectedStudentId(newValue?.id.toString() || '')}
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  label="Select Employee" 
-                  placeholder="Search by name or employee ID"
-                  sx={{ mt: 2 }}
-                />
-              )}
-              noOptionsText="No available employees (all are already mentors)"
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddInternalMentorDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleCreateInternalMentor} 
-            variant="contained" 
-            disabled={!selectedStudentId || creatingMentor}
-          >
-            {creatingMentor ? <CircularProgress size={24} /> : 'Create Mentor'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Add Internal Mentor Dialog - Reusable Component */}
+      <AssignInternalMentorDialog
+        open={addInternalMentorDialogOpen}
+        onClose={() => setAddInternalMentorDialogOpen(false)}
+        onAssign={handleAssignInternalMentor}
+        isDraft={false}
+      />
 
-      {/* Add External Mentor Dialog */}
-      <Dialog 
-        open={addExternalMentorDialogOpen} 
-        onClose={() => setAddExternalMentorDialogOpen(false)} 
-        maxWidth="sm" 
-        fullWidth
-      >
-        <DialogTitle>Add External Mentor</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="Name"
-            fullWidth
-            required
-            value={externalMentorData.name}
-            onChange={(e) => setExternalMentorData({ ...externalMentorData, name: e.target.value })}
-            sx={{ mt: 2 }}
-          />
-          <TextField
-            label="Email"
-            type="email"
-            fullWidth
-            value={externalMentorData.email}
-            onChange={(e) => setExternalMentorData({ ...externalMentorData, email: e.target.value })}
-            sx={{ mt: 2 }}
-          />
-          <TextField
-            label="SBU"
-            select
-            fullWidth
-            value={externalMentorData.sbu}
-            onChange={(e) => setExternalMentorData({ ...externalMentorData, sbu: e.target.value })}
-            sx={{ mt: 2 }}
-          >
-            <MenuItem value="">None</MenuItem>
-            <MenuItem value="IT">IT</MenuItem>
-            <MenuItem value="HR">HR</MenuItem>
-            <MenuItem value="Finance">Finance</MenuItem>
-            <MenuItem value="Operations">Operations</MenuItem>
-            <MenuItem value="Sales">Sales</MenuItem>
-            <MenuItem value="Marketing">Marketing</MenuItem>
-            <MenuItem value="Other">Other</MenuItem>
-          </TextField>
-          <TextField
-            label="Designation"
-            fullWidth
-            value={externalMentorData.designation}
-            onChange={(e) => setExternalMentorData({ ...externalMentorData, designation: e.target.value })}
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddExternalMentorDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleCreateExternalMentor} 
-            variant="contained" 
-            disabled={!externalMentorData.name.trim() || creatingMentor}
-          >
-            {creatingMentor ? <CircularProgress size={24} /> : 'Create Mentor'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Add External Mentor Dialog - Reusable Component */}
+      <AddExternalMentorDialog
+        open={addExternalMentorDialogOpen}
+        onClose={() => setAddExternalMentorDialogOpen(false)}
+        onAdd={handleAddExternalMentor}
+        isDraft={false}
+      />
 
     </Box>
   );

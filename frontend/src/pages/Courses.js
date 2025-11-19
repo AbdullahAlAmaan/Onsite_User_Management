@@ -39,7 +39,7 @@ import { coursesAPI, mentorsAPI } from '../services/api';
 import AssignInternalMentorDialog from '../components/AssignInternalMentorDialog';
 import AddExternalMentorDialog from '../components/AddExternalMentorDialog';
 import { getCourseStatus } from '../utils/courseUtils';
-import { formatDateForAPI } from '../utils/dateUtils';
+import { formatDateForAPI, formatDateForDisplay } from '../utils/dateUtils';
 
 function Courses({ status = 'ongoing' }) {
   const theme = useTheme();
@@ -205,6 +205,12 @@ function Courses({ status = 'ongoing' }) {
 
   const handleSubmit = async () => {
     try {
+      // Validate that end date is not before start date
+      if (formData.end_date && formData.start_date && formData.end_date < formData.start_date) {
+        setMessage({ type: 'error', text: 'End date cannot be before start date' });
+        return;
+      }
+      
       // Determine course status based on checkbox
       const courseStatus = createAsDraft ? 'draft' : 'ongoing';
       
@@ -424,6 +430,12 @@ function Courses({ status = 'ongoing' }) {
     if (!editingCourse) return;
     
     try {
+      // Validate that end date is not before start date
+      if (formData.end_date && formData.start_date && formData.end_date < formData.start_date) {
+        setMessage({ type: 'error', text: 'End date cannot be before start date' });
+        return;
+      }
+      
       await coursesAPI.update(editingCourse.id, {
         name: formData.name,
         batch_code: formData.batch_code,
@@ -446,96 +458,96 @@ function Courses({ status = 'ongoing' }) {
   };
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Box>
-          <Typography 
-            variant="h4" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 600,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
-            {status === 'ongoing' ? 'Ongoing Courses' : status === 'planning' ? 'Planning Courses' : 'Completed Courses'}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {status === 'ongoing' ? 'Courses currently in progress' : status === 'planning' ? 'Courses scheduled for the future' : 'Courses that have been completed'}
-          </Typography>
-        </Box>
-        <Box display="flex" gap={2}>
-          {status === 'planning' && (
-            <Button 
-              variant="contained" 
-              startIcon={<Add />} 
-              onClick={handleOpen}
-              sx={{
-                borderRadius: 2,
-                textTransform: 'none',
-                fontWeight: 500,
-                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-                '&:hover': {
-                  boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
-                },
+    <Box sx={{ minHeight: '100vh', background: `linear-gradient(135deg, ${alpha('#1e40af', 0.03)} 0%, ${alpha('#059669', 0.03)} 100%)` }}>
+      {/* Enhanced header with modern gradient and improved spacing */}
+      <Box sx={{ mb: 4, pt: 2 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography 
+              variant="h3" 
+              sx={{ 
+                fontWeight: 700,
+                color: '#1e40af',
+                mb: 1,
+                letterSpacing: '-0.02em',
               }}
             >
-              New Course
-            </Button>
-          )}
+              {status === 'ongoing' ? ' Ongoing Courses' : status === 'planning' ? ' Planning Courses' : ' Completed Courses'}
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.95rem' }}>
+              {status === 'ongoing' ? 'Courses currently in progress' : status === 'planning' ? 'Courses scheduled for the future' : 'Courses that have been completed'}
+            </Typography>
+          </Box>
+          <Box display="flex" gap={2}>
+            {status === 'planning' && (
+              <Button 
+                variant="contained" 
+                startIcon={<Add />} 
+                onClick={handleOpen}
+                sx={{
+                  background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
+                  borderRadius: '8px',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3,
+                  boxShadow: '0 4px 12px rgba(30, 64, 175, 0.25)',
+                  '&:hover': {
+                    boxShadow: '0 6px 20px rgba(30, 64, 175, 0.35)',
+                  },
+                }}
+              >
+                Add New Course
+              </Button>
+            )}
+          </Box>
         </Box>
       </Box>
 
       {message && (
         <Alert 
-          severity={message.type} 
+          severity={message.type}
+          onClose={() => setMessage(null)}
           sx={{ 
             mb: 3,
-            borderRadius: 2,
+            borderRadius: '8px',
+            border: 'none',
             boxShadow: `0 4px 12px ${alpha(theme.palette[message.type === 'success' ? 'success' : 'error'].main, 0.15)}`,
           }} 
-          onClose={() => setMessage(null)}
         >
           {message.text}
         </Alert>
       )}
 
       {loading ? (
-        <Box display="flex" justifyContent="center" p={3}>
-          <CircularProgress />
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress sx={{ color: '#1e40af' }} />
         </Box>
       ) : (
         <>
-          {/* Search and Filter Section */}
+          {/* Filter card with modern design */}
           <Card
             sx={{
-              borderRadius: 3,
-              boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+              border: '1px solid rgba(30, 64, 175, 0.1)',
               mb: 3,
+              background: '#ffffff',
             }}
           >
-            <CardContent>
-              <Box display="flex" gap={2} flexWrap="wrap">
+            <CardContent sx={{ p: 3 }}>
+              <Box display="flex" gap={2} flexWrap="wrap" alignItems="flex-end">
                 <Autocomplete
                   options={allCourses}
                   getOptionLabel={(option) => option ? `${option.name} (${option.batch_code})` : ''}
                   value={selectedSearchCourse}
                   onChange={(event, newValue) => {
                     setSelectedSearchCourse(newValue);
-                    if (newValue) {
-                      setSearchQuery(newValue.name || '');
-                    } else {
-                      setSearchQuery('');
-                    }
+                    if (newValue) setSearchQuery(newValue.name || '');
+                    else setSearchQuery('');
                   }}
                   onInputChange={(event, newInputValue) => {
                     setSearchQuery(newInputValue);
-                    if (!newInputValue) {
-                      setSelectedSearchCourse(null);
-                    }
+                    if (!newInputValue) setSelectedSearchCourse(null);
                   }}
                   inputValue={searchQuery}
                   filterOptions={(options, { inputValue }) => {
@@ -552,13 +564,13 @@ function Courses({ status = 'ongoing' }) {
                       label="Search Courses"
                       placeholder="Search by name or batch code..."
                       size="small"
-                      sx={{ minWidth: 300, flexGrow: 1 }}
+                      sx={{ minWidth: 280, flex: 1 }}
                       InputProps={{
                         ...params.InputProps,
                         startAdornment: (
                           <>
                             <InputAdornment position="start">
-                              <Search sx={{ color: 'text.secondary' }} />
+                              <Search sx={{ color: '#94a3b8', fontSize: '1.2rem' }} />
                             </InputAdornment>
                             {params.InputProps.startAdornment}
                           </>
@@ -569,7 +581,7 @@ function Courses({ status = 'ongoing' }) {
                   renderOption={(props, course) => (
                     <Box component="li" {...props} key={course.id}>
                       <Box>
-                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           {course.name}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
@@ -584,44 +596,41 @@ function Courses({ status = 'ongoing' }) {
                 />
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
-                    label="Start Date (From)"
+                    label="Start Date"
                     value={startDateFilter}
                     onChange={(newValue) => setStartDateFilter(newValue)}
                     slotProps={{
                       textField: {
                         size: 'small',
-                        sx: { minWidth: 200 },
+                        sx: { minWidth: 160 },
                       },
                     }}
-                    views={['year', 'month', 'day']}
                   />
                   <DatePicker
-                    label="End Date (To)"
+                    label="End Date"
                     value={endDateFilter}
                     onChange={(newValue) => setEndDateFilter(newValue)}
                     slotProps={{
                       textField: {
                         size: 'small',
-                        sx: { minWidth: 200 },
+                        sx: { minWidth: 160 },
                       },
                     }}
-                    views={['year', 'month', 'day']}
                   />
                 </LocalizationProvider>
-                {(startDateFilter || endDateFilter || searchQuery || selectedSBU) && (
+                {(startDateFilter || endDateFilter || searchQuery) && (
                   <Button
-                    variant="outlined"
+                    variant="text"
                     size="small"
                     onClick={() => {
                       setStartDateFilter(null);
                       setEndDateFilter(null);
                       setSearchQuery('');
                       setSelectedSearchCourse(null);
-                      setSelectedSBU('');
                     }}
-                    sx={{ alignSelf: 'flex-start', mt: 0.5 }}
+                    sx={{ color: '#64748b', fontWeight: 500 }}
                   >
-                    Clear Filters
+                    Clear
                   </Button>
                 )}
               </Box>
@@ -630,106 +639,104 @@ function Courses({ status = 'ongoing' }) {
 
           <Card
             sx={{
-              borderRadius: 3,
-              boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+              border: '1px solid rgba(30, 64, 175, 0.1)',
               overflow: 'hidden',
+              background: '#ffffff',
             }}
           >
             <TableContainer>
               <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Batch Code</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Start Date</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Seats</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Enrolled</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Available</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+                <TableHead>
+                  <TableRow sx={{ background: 'linear-gradient(135deg, rgba(30, 64, 175, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)' }}>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Course Name</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Batch Code</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Start Date</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }} align="right">Seats</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }} align="right">Enrolled</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }} align="right">Available</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }} align="center">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                   {filteredCourses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="text.secondary">
+                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                        <Typography color="text.secondary" sx={{ fontSize: '0.95rem' }}>
                           No courses found
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredCourses.map((course) => (
-                  <TableRow
+                      <TableRow
                         key={course.id}
-                    sx={{
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.03),
-                            cursor: 'pointer',
-                      },
-                      transition: 'background-color 0.2s',
-                    }}
+                        sx={{
+                          borderBottom: '1px solid rgba(30, 64, 175, 0.08)',
+                          '&:hover': {
+                            background: 'linear-gradient(90deg, rgba(30, 64, 175, 0.03) 0%, rgba(5, 150, 105, 0.03) 100%)',
+                          },
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
                         onClick={() => handleViewDetails(course.id)}
                       >
-                    <TableCell>{course.name}</TableCell>
-                    <TableCell>{course.batch_code}</TableCell>
-                    <TableCell>{course.start_date}</TableCell>
-                    <TableCell>{course.seat_limit}</TableCell>
-                    <TableCell>{course.current_enrolled}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={course.seat_limit - course.current_enrolled}
-                        color={course.seat_limit - course.current_enrolled > 0 ? 'success' : 'error'}
-                        size="small"
-                      />
-                    </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Box display="flex" gap={1}>
-                        <IconButton
-                          color="primary"
-                          onClick={() => handleEdit(course)}
-                          title="Edit Course"
-                          size="small"
-                        >
-                          <Edit />
-                        </IconButton>
-                        <IconButton
-                          color="primary"
-                          onClick={() => handleGenerateReport(course.id)}
-                          title="Generate Report"
-                                                  size="small"
-                        >
-                              <Download />
-                                                  </IconButton>
-                        {status === 'planning' && (course.status === 'draft' || String(course.status).toLowerCase() === 'draft') && (
-                                                  <IconButton
-                                                    color="success"
-                              onClick={() => handleApproveCourse(course.id)}
-                              title="Approve Course"
-                                                    size="small"
-                                                  >
-                              <CheckCircle />
-                                                  </IconButton>
-                        )}
-                        {status !== 'completed' && (
-                                                <IconButton
-                                                    color="error"
-                              onClick={() => handleDelete(course.id)}
-                              title="Delete Course"
-                                                    size="small"
-                            >
-                              <Delete />
-                                                  </IconButton>
-                                                )}
-                                </Box>
-                    </TableCell>
-                  </TableRow>
+                        <TableCell sx={{ fontWeight: 500, color: '#1e3a8a' }}>{course.name}</TableCell>
+                        <TableCell sx={{ color: '#475569' }}>{course.batch_code}</TableCell>
+                        <TableCell sx={{ color: '#64748b' }}>{formatDateForDisplay(course.start_date)}</TableCell>
+                        <TableCell align="right" sx={{ color: '#475569' }}>{course.seat_limit}</TableCell>
+                        <TableCell align="right" sx={{ color: '#475569' }}>{course.current_enrolled}</TableCell>
+                        <TableCell align="right">
+                          <Chip
+                            label={course.seat_limit - course.current_enrolled}
+                            size="small"
+                            sx={{
+                              background: course.seat_limit - course.current_enrolled > 0 
+                                ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
+                                : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                              color: course.seat_limit - course.current_enrolled > 0 ? '#047857' : '#991b1b',
+                              fontWeight: 600,
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                          <Box display="flex" gap={0.5} justifyContent="center">
+                            <IconButton size="small" color="primary" title="Edit" onClick={() => handleEdit(course)}>
+                              <Edit sx={{ fontSize: '1.1rem' }} />
+                            </IconButton>
+                            <IconButton size="small" sx={{ color: '#94a3b8' }} title="Download" onClick={() => handleGenerateReport(course.id)}>
+                              <Download sx={{ fontSize: '1.1rem' }} />
+                            </IconButton>
+                            {status === 'planning' && (course.status === 'draft' || String(course.status).toLowerCase() === 'draft') && (
+                              <IconButton
+                                color="success"
+                                onClick={() => handleApproveCourse(course.id)}
+                                title="Approve Course"
+                                size="small"
+                              >
+                                <CheckCircle />
+                              </IconButton>
+                            )}
+                            {status !== 'completed' && (
+                              <IconButton
+                                color="error"
+                                onClick={() => handleDelete(course.id)}
+                                title="Delete Course"
+                                size="small"
+                              >
+                                <Delete />
+                              </IconButton>
+                            )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        </Card>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
         </>
       )}
 
@@ -764,7 +771,13 @@ function Courses({ status = 'ongoing' }) {
               <DatePicker
                 label="Start Date"
                 value={formData.start_date}
-                onChange={(newValue) => setFormData({ ...formData, start_date: newValue })}
+                onChange={(newValue) => {
+                  setFormData({ ...formData, start_date: newValue });
+                  // If end date is before new start date, clear it
+                  if (formData.end_date && newValue && formData.end_date < newValue) {
+                    setFormData(prev => ({ ...prev, end_date: null }));
+                  }
+                }}
                 slotProps={{
                   textField: {
                     fullWidth: true,
@@ -775,10 +788,22 @@ function Courses({ status = 'ongoing' }) {
               <DatePicker
                 label="End Date"
                 value={formData.end_date}
-                onChange={(newValue) => setFormData({ ...formData, end_date: newValue })}
+                onChange={(newValue) => {
+                  // Validate that end date is not before start date
+                  if (newValue && formData.start_date && newValue < formData.start_date) {
+                    setMessage({ type: 'error', text: 'End date cannot be before start date' });
+                    return;
+                  }
+                  setFormData({ ...formData, end_date: newValue });
+                }}
+                minDate={formData.start_date || undefined}
                 slotProps={{
                   textField: {
                     fullWidth: true,
+                    error: formData.end_date && formData.start_date && formData.end_date < formData.start_date,
+                    helperText: formData.end_date && formData.start_date && formData.end_date < formData.start_date 
+                      ? 'End date cannot be before start date' 
+                      : '',
                   },
                 }}
               />
@@ -950,7 +975,13 @@ function Courses({ status = 'ongoing' }) {
               <DatePicker
                 label="Start Date"
                 value={formData.start_date}
-                onChange={(newValue) => setFormData({ ...formData, start_date: newValue })}
+                onChange={(newValue) => {
+                  setFormData({ ...formData, start_date: newValue });
+                  // If end date is before new start date, clear it
+                  if (formData.end_date && newValue && formData.end_date < newValue) {
+                    setFormData(prev => ({ ...prev, end_date: null }));
+                  }
+                }}
                 slotProps={{
                   textField: {
                     fullWidth: true,
@@ -961,10 +992,22 @@ function Courses({ status = 'ongoing' }) {
               <DatePicker
                 label="End Date"
                 value={formData.end_date}
-                onChange={(newValue) => setFormData({ ...formData, end_date: newValue })}
+                onChange={(newValue) => {
+                  // Validate that end date is not before start date
+                  if (newValue && formData.start_date && newValue < formData.start_date) {
+                    setMessage({ type: 'error', text: 'End date cannot be before start date' });
+                    return;
+                  }
+                  setFormData({ ...formData, end_date: newValue });
+                }}
+                minDate={formData.start_date || undefined}
                 slotProps={{
                   textField: {
                     fullWidth: true,
+                    error: formData.end_date && formData.start_date && formData.end_date < formData.start_date,
+                    helperText: formData.end_date && formData.start_date && formData.end_date < formData.start_date 
+                      ? 'End date cannot be before start date' 
+                      : '',
                   },
                 }}
               />

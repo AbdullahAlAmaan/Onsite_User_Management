@@ -373,115 +373,124 @@ function Users() {
   };
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={2}>
-            <Typography 
-              variant="h4" 
-              gutterBottom
-              sx={{ 
+    <Box sx={{ minHeight: '100vh', background: `linear-gradient(135deg, ${alpha('#1e40af', 0.03)} 0%, ${alpha('#059669', 0.03)} 100%)` }}>
+      {/* Enhanced header with modern design */}
+      <Box sx={{ mb: 4, pt: 2 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Box display="flex" alignItems="center" gap={2} mb={1}>
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontWeight: 700,
+                  color: '#1e40af',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                All Employees
+              </Typography>
+              <Chip 
+                label={`${employeeCount} active`}
+                sx={{
+                  background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                  color: '#1e40af',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                }}
+              />
+            </Box>
+            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.95rem' }}>
+              Manage your workforce and track training progress
+            </Typography>
+          </Box>
+          <Box display="flex" gap={2} flexWrap="wrap" justifyContent="flex-end">
+            <Button
+              variant="outlined"
+              startIcon={<Description />}
+              onClick={handleGenerateOverallReport}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
                 fontWeight: 600,
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
+                color: '#1e40af',
+                borderColor: '#1e40af',
+                '&:hover': { background: alpha('#1e40af', 0.05) },
               }}
             >
-              All Employees
-            </Typography>
-            <Chip 
-              label={`${employeeCount} employees`}
-              color="primary"
-              sx={{ fontWeight: 600 }}
-            />
+              Generate Report
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<UploadFile />}
+              onClick={() => setImportDialogOpen(true)}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 600,
+                color: '#1e40af',
+                borderColor: '#1e40af',
+                '&:hover': { background: alpha('#1e40af', 0.05) },
+              }}
+            >
+              Import
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<PersonAdd />}
+              onClick={() => setCreateDialogOpen(true)}
+              sx={{
+                background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                boxShadow: '0 4px 12px rgba(30, 64, 175, 0.25)',
+              }}
+            >
+              Add Employee
+            </Button>
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            View all employees with their course history and attendance
-          </Typography>
-        </Box>
-        <Box display="flex" gap={2}>
-          <Button
-            variant="outlined"
-            startIcon={<Description />}
-            onClick={handleGenerateOverallReport}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-            }}
-          >
-            Generate Overall Report
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<UploadFile />}
-            onClick={() => setImportDialogOpen(true)}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-            }}
-          >
-            Upload Total Employees
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<PersonAdd />}
-            onClick={() => setCreateDialogOpen(true)}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500,
-              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-            }}
-          >
-            Add Employee
-          </Button>
         </Box>
       </Box>
 
       {message && (
         <Alert 
-          severity={message.type} 
+          severity={message.type}
+          onClose={() => setMessage(null)}
           sx={{ 
             mb: 3,
-            borderRadius: 2,
-            boxShadow: `0 4px 12px ${alpha(theme.palette[message.type === 'success' ? 'success' : 'error'].main, 0.15)}`,
+            borderRadius: '8px',
+            border: 'none',
           }} 
-          onClose={() => setMessage(null)}
         >
           {message.text}
         </Alert>
       )}
 
+      {/* Filter section with modern card design */}
       <Card
         sx={{
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          border: '1px solid rgba(30, 64, 175, 0.1)',
           mb: 3,
-          borderRadius: 3,
-          boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+          background: '#ffffff',
         }}
       >
-        <CardContent>
-          <Box display="flex" gap={2} flexWrap="wrap">
+        <CardContent sx={{ p: 3 }}>
+          <Box display="flex" gap={2} flexWrap="wrap" alignItems="flex-end">
             <Autocomplete
               options={allUsers}
-              getOptionLabel={(option) => option ? `${option.name} (${option.employee_id}) - ${option.email}` : ''}
+              getOptionLabel={(option) => option ? `${option.name} (${option.employee_id})` : ''}
               value={selectedSearchUser}
               onChange={(event, newValue) => {
                 setSelectedSearchUser(newValue);
-                if (newValue) {
-                  setSearchQuery(newValue.name || '');
-                } else {
-                  setSearchQuery('');
-                }
+                if (newValue) setSearchQuery(newValue.name || '');
+                else setSearchQuery('');
               }}
               onInputChange={(event, newInputValue) => {
                 setSearchQuery(newInputValue);
-                if (!newInputValue) {
-                  setSelectedSearchUser(null);
-                }
+                if (!newInputValue) setSelectedSearchUser(null);
               }}
               inputValue={searchQuery}
               filterOptions={(options, { inputValue }) => {
@@ -496,16 +505,16 @@ function Users() {
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Search Employees"
-                  placeholder="Search by name, email, or employee ID..."
+                  label="Search"
+                  placeholder="Name, email, or ID..."
                   size="small"
-                  sx={{ minWidth: 300, flexGrow: 1 }}
+                  sx={{ minWidth: 280, flex: 1 }}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: (
                       <>
                         <InputAdornment position="start">
-                          <Search sx={{ color: 'text.secondary' }} />
+                          <Search sx={{ color: '#94a3b8' }} />
                         </InputAdornment>
                         {params.InputProps.startAdornment}
                       </>
@@ -513,28 +522,14 @@ function Users() {
                   }}
                 />
               )}
-              renderOption={(props, user) => (
-                <Box component="li" {...props} key={user.id}>
-                  <Box>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {user.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {user.employee_id} • {user.email}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
               noOptionsText="No employees found"
-              clearOnEscape
-              clearOnBlur={false}
             />
             <TextField
               select
               label="SBU"
               value={selectedSBU}
               onChange={(e) => setSelectedSBU(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 140 }}
               size="small"
             >
               <MenuItem value="">All SBUs</MenuItem>
@@ -544,35 +539,33 @@ function Users() {
               <MenuItem value="Operations">Operations</MenuItem>
               <MenuItem value="Sales">Sales</MenuItem>
               <MenuItem value="Marketing">Marketing</MenuItem>
-              <MenuItem value="Other">Other</MenuItem>
             </TextField>
             <TextField
               select
               label="Course History"
               value={filterNeverTaken}
               onChange={(e) => setFilterNeverTaken(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 160 }}
               size="small"
             >
               <MenuItem value="">All Employees</MenuItem>
-              <MenuItem value="yes">Never Taken a Course</MenuItem>
-              <MenuItem value="no">Has Taken Courses</MenuItem>
+              <MenuItem value="yes">No Course History</MenuItem>
             </TextField>
             <TextField
               select
-              label="Mentor Status"
+              label="Mentor"
               value={filterMentorStatus}
               onChange={(e) => setFilterMentorStatus(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 140 }}
               size="small"
             >
-              <MenuItem value="">All Employees</MenuItem>
+              <MenuItem value="">All</MenuItem>
               <MenuItem value="mentor">Mentors</MenuItem>
-              <MenuItem value="not_mentor">Not Mentors</MenuItem>
+              <MenuItem value="not_mentor">Non-Mentors</MenuItem>
             </TextField>
             {(selectedSBU || filterNeverTaken || filterMentorStatus || searchQuery) && (
               <Button
-                variant="outlined"
+                variant="text"
                 size="small"
                 onClick={() => {
                   setSelectedSBU('');
@@ -581,9 +574,9 @@ function Users() {
                   setSearchQuery('');
                   setSelectedSearchUser(null);
                 }}
-                sx={{ alignSelf: 'flex-start', mt: 0.5 }}
+                sx={{ color: '#64748b', fontWeight: 500 }}
               >
-                Clear Filters
+                Clear
               </Button>
             )}
           </Box>
@@ -591,30 +584,30 @@ function Users() {
       </Card>
 
       {loading ? (
-        <Box display="flex" justifyContent="center" p={3}>
-          <CircularProgress />
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress sx={{ color: '#1e40af' }} />
         </Box>
       ) : (
         <Card
           sx={{
-            borderRadius: 3,
-            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            borderRadius: '12px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+            border: '1px solid rgba(30, 64, 175, 0.1)',
             overflow: 'hidden',
+            background: '#ffffff',
           }}
         >
           <TableContainer>
             <Table>
               <TableHead>
-                <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                  <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Mentor</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Course History</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Remove</TableCell>
+                <TableRow sx={{ background: 'linear-gradient(135deg, rgba(30, 64, 175, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)' }}>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>ID</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>SBU</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Mentor</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }} align="center">Course History</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }} align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -622,94 +615,80 @@ function Users() {
                   <React.Fragment key={user.id}>
                     <TableRow
                       sx={{
+                        borderBottom: '1px solid rgba(30, 64, 175, 0.08)',
                         '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.03),
+                          background: 'linear-gradient(90deg, rgba(30, 64, 175, 0.03) 0%, rgba(5, 150, 105, 0.03) 100%)',
                         },
-                        backgroundColor: user.never_taken_course ? alpha(theme.palette.warning.main, 0.05) : 'transparent',
-                        borderLeft: user.never_taken_course ? `4px solid ${theme.palette.warning.main}` : 'none',
+                        backgroundColor: user.never_taken_course ? alpha('#f59e0b', 0.03) : 'transparent',
                       }}
                     >
                       <TableCell>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Typography
-                            sx={{
-                              cursor: 'pointer',
-                              color: 'primary.main',
-                              textDecoration: 'underline',
-                              '&:hover': {
-                                color: 'primary.dark',
-                              },
-                            }}
-                            onClick={() => handleViewDetails(user)}
-                          >
-                            {user.employee_id}
-                          </Typography>
-                        </Box>
+                        <Typography sx={{ color: '#1e40af', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleViewDetails(user)}>
+                          {user.employee_id}
+                        </Typography>
                       </TableCell>
+                      <TableCell sx={{ fontWeight: 500, color: '#1e3a8a' }}>{user.name}</TableCell>
+                      <TableCell sx={{ color: '#64748b' }}>{user.email}</TableCell>
                       <TableCell>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          {user.name}
-                          {user.never_taken_course && (
-                            <Chip 
-                              label="Never taken a course" 
-                              color="warning" 
-                              size="small"
-                              variant="outlined"
-                              sx={{ 
-                                fontSize: '0.65rem',
-                                height: 18,
-                              }}
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Chip label={user.sbu} size="small" />
-                      </TableCell>
-                      <TableCell>{user.designation || '-'}</TableCell>
-                      <TableCell>
-                        <Chip
-                          icon={<School />}
-                          label={mentorStatuses[user.id] ? 'Mentor' : 'Not Mentor'}
-                          color={mentorStatuses[user.id] ? 'primary' : 'default'}
+                        <Chip 
+                          label={user.sbu} 
                           size="small"
-                          onClick={() => handleToggleMentorTag(user.id)}
-                          disabled={updatingMentorStatus[user.id]}
-                          sx={{ cursor: 'pointer' }}
+                          sx={{
+                            background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                            color: '#1e40af',
+                            fontWeight: 600,
+                          }}
                         />
                       </TableCell>
                       <TableCell>
-                        <Box display="flex" alignItems="center" gap={1}>
+                        <Chip
+                          icon={<School />}
+                          label={mentorStatuses[user.id] ? 'Yes' : 'No'}
+                          size="small"
+                          onClick={() => handleToggleMentorTag(user.id)}
+                          disabled={updatingMentorStatus[user.id]}
+                          sx={{
+                            cursor: 'pointer',
+                            background: mentorStatuses[user.id] 
+                              ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
+                              : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+                            color: mentorStatuses[user.id] ? '#047857' : '#6b7280',
+                            fontWeight: 600,
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        {user.enrollments && user.enrollments.length > 0 ? (
                           <IconButton
                             size="small"
                             onClick={() => handleToggleExpand(user.id)}
+                            title="View Course History"
+                            sx={{ color: '#1e40af' }}
                           >
-                            {expandedUser === user.id ? <ExpandLess /> : <ExpandMore />}
+                            <Visibility fontSize="small" />
                           </IconButton>
-                          {user.never_taken_course && (
-                            <Chip 
-                              label="New" 
-                              color="warning" 
-                              size="small"
-                              sx={{ 
-                                fontWeight: 600,
-                                fontSize: '0.7rem',
-                                height: 20,
-                              }}
-                            />
-                          )}
-                        </Box>
+                        ) : (
+                          <Chip
+                            label="No Course History"
+                            size="small"
+                            sx={{
+                              background: alpha('#fbbf24', 0.1),
+                              color: '#92400e',
+                              fontWeight: 500,
+                              border: `1px solid ${alpha('#fbbf24', 0.3)}`,
+                            }}
+                          />
+                        )}
                       </TableCell>
-                      <TableCell>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleRemoveEmployee(user)}
-                          title="Remove Employee"
-                        >
-                          <PersonRemove />
-                        </IconButton>
+                      <TableCell align="center">
+                        <Box display="flex" justifyContent="center" gap={0.5}>
+                          <IconButton size="small" title="View Details" onClick={() => handleViewDetails(user)}>
+                            <Visibility sx={{ fontSize: '1.1rem', color: '#1e40af' }} />
+                          </IconButton>
+                          <IconButton size="small" title="Remove" onClick={() => handleRemoveEmployee(user)}>
+                            <PersonRemove sx={{ fontSize: '1.1rem', color: '#ef4444' }} />
+                          </IconButton>
+                        </Box>
                       </TableCell>
                     </TableRow>
                     <TableRow>
@@ -1090,8 +1069,6 @@ function Users() {
                   </TableContainer>
                   <Box sx={{ p: 1, backgroundColor: alpha(theme.palette.info.main, 0.05), borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      <strong>Note:</strong> Column names are case-insensitive. SBU values: IT, HR, Finance, Operations, Sales, Marketing, Other. 
-                      Optional fields: designation, career_start_date, bs_join_date (or bs_joining_date). Date format: DD-MM-YYYY or YYYY-MM-DD.
                     </Typography>
                   </Box>
                 </Box>

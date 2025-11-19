@@ -27,9 +27,10 @@ import {
   InputAdornment,
   Autocomplete,
 } from '@mui/material';
-import { ExpandMore, ExpandLess, Visibility, PersonAdd, Search } from '@mui/icons-material';
+import { ExpandMore, ExpandLess, Visibility, PersonAdd, Search, PersonRemove } from '@mui/icons-material';
 import { studentsAPI } from '../services/api';
 import UserDetailsDialog from '../components/UserDetailsDialog';
+import { formatDateForDisplay } from '../utils/dateUtils';
 
 function PreviousEmployees() {
   const theme = useTheme();
@@ -145,71 +146,77 @@ function PreviousEmployees() {
   }
 
   return (
-    <Box>
+    <Box sx={{ minHeight: '100vh', background: `linear-gradient(135deg, ${alpha('#1e40af', 0.03)} 0%, ${alpha('#059669', 0.03)} 100%)` }}>
+      {/* Modern header design */}
+      <Box sx={{ mb: 4, pt: 2 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Box display="flex" alignItems="center" gap={2} mb={1}>
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontWeight: 700,
+                  color: '#1e40af',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Previous Employees
+              </Typography>
+              <Chip 
+                label={`${employeeCount} inactive`}
+                sx={{
+                  background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                  color: '#991b1b',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                }}
+              />
+            </Box>
+            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.95rem' }}>
+              View and manage previously removed employees
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+
       {message && (
-        <Alert
+        <Alert 
           severity={message.type}
           onClose={() => setMessage(null)}
-          sx={{ mb: 2 }}
+          sx={{ 
+            mb: 3,
+            borderRadius: '8px',
+            border: 'none',
+          }} 
         >
           {message.text}
         </Alert>
       )}
 
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={2}>
-            <Typography 
-              variant="h4" 
-              gutterBottom
-              sx={{ 
-                fontWeight: 600,
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}
-            >
-              Previous Employees
-            </Typography>
-            <Chip 
-              label={`${employeeCount} employees`}
-              color="secondary"
-              sx={{ fontWeight: 600 }}
-            />
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            View previously removed employees with their complete course history
-          </Typography>
-        </Box>
-      </Box>
-
+      {/* Filter card with modern styling */}
       <Card
         sx={{
-          borderRadius: 3,
-          boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.1)}`,
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          border: '1px solid rgba(30, 64, 175, 0.1)',
           mb: 3,
+          background: '#ffffff',
         }}
       >
-        <CardContent>
-          <Box display="flex" gap={2} mb={3} flexWrap="wrap">
+        <CardContent sx={{ p: 3 }}>
+          <Box display="flex" gap={2} flexWrap="wrap" alignItems="flex-end">
             <Autocomplete
               options={allUsers}
-              getOptionLabel={(option) => option ? `${option.name} (${option.employee_id}) - ${option.email}` : ''}
+              getOptionLabel={(option) => option ? `${option.name} (${option.employee_id})` : ''}
               value={selectedSearchUser}
               onChange={(event, newValue) => {
                 setSelectedSearchUser(newValue);
-                if (newValue) {
-                  setSearchQuery(newValue.name || '');
-                } else {
-                  setSearchQuery('');
-                }
+                if (newValue) setSearchQuery(newValue.name || '');
+                else setSearchQuery('');
               }}
               onInputChange={(event, newInputValue) => {
                 setSearchQuery(newInputValue);
-                if (!newInputValue) {
-                  setSelectedSearchUser(null);
-                }
+                if (!newInputValue) setSelectedSearchUser(null);
               }}
               inputValue={searchQuery}
               filterOptions={(options, { inputValue }) => {
@@ -224,16 +231,16 @@ function PreviousEmployees() {
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Search Employees"
-                  placeholder="Search by name, email, or employee ID..."
+                  label="Search"
+                  placeholder="Name, email, or ID..."
                   size="small"
-                  sx={{ minWidth: 300, flexGrow: 1 }}
+                  sx={{ minWidth: 280, flex: 1 }}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: (
                       <>
                         <InputAdornment position="start">
-                          <Search sx={{ color: 'text.secondary' }} />
+                          <Search sx={{ color: '#94a3b8' }} />
                         </InputAdornment>
                         {params.InputProps.startAdornment}
                       </>
@@ -241,28 +248,14 @@ function PreviousEmployees() {
                   }}
                 />
               )}
-              renderOption={(props, user) => (
-                <Box component="li" {...props} key={user.id}>
-                  <Box>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {user.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {user.employee_id} • {user.email}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
               noOptionsText="No employees found"
-              clearOnEscape
-              clearOnBlur={false}
             />
             <TextField
               select
               label="SBU"
               value={selectedSBU}
               onChange={(e) => setSelectedSBU(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 140 }}
               size="small"
             >
               <MenuItem value="">All SBUs</MenuItem>
@@ -272,206 +265,212 @@ function PreviousEmployees() {
               <MenuItem value="Operations">Operations</MenuItem>
               <MenuItem value="Sales">Sales</MenuItem>
               <MenuItem value="Marketing">Marketing</MenuItem>
-              <MenuItem value="Other">Other</MenuItem>
             </TextField>
             <TextField
               select
               label="Course History"
               value={filterNeverTaken}
               onChange={(e) => setFilterNeverTaken(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 160 }}
               size="small"
             >
               <MenuItem value="">All Employees</MenuItem>
-              <MenuItem value="yes">Never Taken a Course</MenuItem>
-              <MenuItem value="no">Has Taken Courses</MenuItem>
+              <MenuItem value="yes">No Course History</MenuItem>
             </TextField>
-          </Box>
-
-          <Box
-            sx={{
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              overflow: 'hidden',
-            }}
-          >
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.05) }}>
-                    <TableCell sx={{ fontWeight: 600 }}>Employee ID</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>SBU</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Designation</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Course History</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {users.map((user) => (
-                    <React.Fragment key={user.id}>
-                      <TableRow
-                        sx={{
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.03),
-                          },
-                          backgroundColor: user.never_taken_course ? alpha(theme.palette.warning.main, 0.05) : 'transparent',
-                          borderLeft: user.never_taken_course ? `4px solid ${theme.palette.warning.main}` : 'none',
-                        }}
-                      >
-                        <TableCell>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Typography
-                              sx={{
-                                cursor: 'pointer',
-                                color: 'primary.main',
-                                textDecoration: 'underline',
-                                '&:hover': {
-                                  color: 'primary.dark',
-                                },
-                              }}
-                              onClick={() => handleViewDetails(user)}
-                            >
-                              {user.employee_id}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            {user.name}
-                            {user.never_taken_course && (
-                              <Chip 
-                                label="Never taken a course" 
-                                color="warning" 
-                                size="small"
-                                variant="outlined"
-                                sx={{ 
-                                  fontSize: '0.65rem',
-                                  height: 18,
-                                }}
-                              />
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          <Chip label={user.sbu} size="small" />
-                        </TableCell>
-                        <TableCell>{user.designation || '-'}</TableCell>
-                        <TableCell>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleToggleExpand(user.id)}
-                            >
-                              {expandedUser === user.id ? <ExpandLess /> : <ExpandMore />}
-                            </IconButton>
-                            {user.never_taken_course && (
-                              <Chip 
-                                label="New" 
-                                color="warning" 
-                                size="small"
-                                sx={{ 
-                                  fontWeight: 600,
-                                  fontSize: '0.7rem',
-                                  height: 20,
-                                }}
-                              />
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                            startIcon={<PersonAdd />}
-                            onClick={() => handleRestoreEmployee(user)}
-                          >
-                            Restore
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
-                          <Collapse in={expandedUser === user.id} timeout="auto" unmountOnExit>
-                            <Box sx={{ margin: 2 }}>
-                              <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                                Course History
-                              </Typography>
-                              {user.enrollments && user.enrollments.length > 0 ? (
-                                <Box display="flex" flexDirection="column" gap={2}>
-                                  {user.enrollments.map((enrollment) => (
-                                    <Card
-                                      key={enrollment.id}
-                                      sx={{
-                                        p: 2,
-                                        backgroundColor: alpha(theme.palette.primary.main, 0.02),
-                                        border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                                      }}
-                                    >
-                                      <Box display="flex" justifyContent="space-between" alignItems="start">
-                                        <Box>
-                                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                            {enrollment.course?.name || 'Unknown Course'}
-                                          </Typography>
-                                          <Typography variant="body2" color="text.secondary">
-                                            Batch: {enrollment.course?.batch_code || 'N/A'}
-                                          </Typography>
-                                          {enrollment.course_start_date && (
-                                            <Typography variant="body2" color="text.secondary">
-                                              Start Date: {enrollment.course_start_date}
-                                            </Typography>
-                                          )}
-                                          {enrollment.course_end_date && (
-                                            <Typography variant="body2" color="text.secondary">
-                                              Completion Date: {enrollment.course_end_date}
-                                            </Typography>
-                                          )}
-                                        </Box>
-                                        <Box display="flex" flexDirection="column" alignItems="flex-end" gap={1}>
-                                          <Chip
-                                            label={enrollment.status || 'Enrolled'}
-                                            color={
-                                              enrollment.status === 'Completed' ? 'success' :
-                                              enrollment.status === 'In Progress' ? 'info' :
-                                              enrollment.status === 'Withdrawn' ? 'error' :
-                                              'default'
-                                            }
-                                            size="small"
-                                          />
-                                          {enrollment.completion_rate !== null && enrollment.completion_rate !== undefined && (
-                                            <Typography variant="body2" color="text.secondary">
-                                              Completion: {enrollment.completion_rate}%
-                                            </Typography>
-                                          )}
-                                          {enrollment.score !== null && enrollment.score !== undefined && (
-                                            <Typography variant="body2" color="text.secondary">
-                                              Score: {enrollment.score}
-                                            </Typography>
-                                          )}
-                                        </Box>
-                                      </Box>
-                                    </Card>
-                                  ))}
-                                </Box>
-                              ) : (
-                                <Typography variant="body2" color="text.secondary">
-                                  No course history available
-                                </Typography>
-                              )}
-                            </Box>
-                          </Collapse>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            {(selectedSBU || filterNeverTaken || searchQuery) && (
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => {
+                  setSelectedSBU('');
+                  setFilterNeverTaken('');
+                  setSearchQuery('');
+                  setSelectedSearchUser(null);
+                }}
+                sx={{ color: '#64748b', fontWeight: 500 }}
+              >
+                Clear
+              </Button>
+            )}
           </Box>
         </CardContent>
       </Card>
+
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress sx={{ color: '#1e40af' }} />
+        </Box>
+      ) : (
+        <Card
+          sx={{
+            borderRadius: '12px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+            border: '1px solid rgba(30, 64, 175, 0.1)',
+            overflow: 'hidden',
+            background: '#ffffff',
+          }}
+        >
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ background: 'linear-gradient(135deg, rgba(30, 64, 175, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)' }}>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>ID</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>SBU</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>Designation</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }} align="center">Course History</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }} align="center">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <React.Fragment key={user.id}>
+                    <TableRow
+                      sx={{
+                        borderBottom: '1px solid rgba(30, 64, 175, 0.08)',
+                        '&:hover': {
+                          background: 'linear-gradient(90deg, rgba(30, 64, 175, 0.03) 0%, rgba(5, 150, 105, 0.03) 100%)',
+                        },
+                        backgroundColor: user.never_taken_course ? alpha('#f59e0b', 0.03) : 'transparent',
+                      }}
+                    >
+                      <TableCell sx={{ color: '#1e40af', fontWeight: 600 }}>{user.employee_id}</TableCell>
+                      <TableCell sx={{ fontWeight: 500, color: '#1e3a8a' }}>{user.name}</TableCell>
+                      <TableCell sx={{ color: '#64748b' }}>{user.email}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={user.sbu} 
+                          size="small"
+                          sx={{
+                            background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                            color: '#1e40af',
+                            fontWeight: 600,
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ color: '#64748b' }}>{user.designation || '-'}</TableCell>
+                      <TableCell align="center">
+                        {user.enrollments && user.enrollments.length > 0 ? (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleToggleExpand(user.id)}
+                            title="View Course History"
+                            sx={{ color: '#1e40af' }}
+                          >
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        ) : (
+                          <Chip
+                            label="No Course History"
+                            size="small"
+                            sx={{
+                              background: alpha('#fbbf24', 0.1),
+                              color: '#92400e',
+                              fontWeight: 500,
+                              border: `1px solid ${alpha('#fbbf24', 0.3)}`,
+                            }}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<PersonAdd />}
+                          sx={{
+                            background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                            borderRadius: '6px',
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            px: 2,
+                          }}
+                          onClick={() => handleRestoreEmployee(user)}
+                        >
+                          Restore
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                        <Collapse in={expandedUser === user.id} timeout="auto" unmountOnExit>
+                          <Box sx={{ margin: 2 }}>
+                            <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                              Course History
+                            </Typography>
+                            {user.enrollments && user.enrollments.length > 0 ? (
+                              <Box display="flex" flexDirection="column" gap={2}>
+                                {user.enrollments.map((enrollment) => (
+                                  <Card
+                                    key={enrollment.id}
+                                    sx={{
+                                      p: 2,
+                                      backgroundColor: alpha(theme.palette.primary.main, 0.02),
+                                      border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                                    }}
+                                  >
+                                    <Box display="flex" justifyContent="space-between" alignItems="start">
+                                      <Box>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                          {enrollment.course?.name || 'Unknown Course'}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Batch: {enrollment.course?.batch_code || 'N/A'}
+                                        </Typography>
+                                        {enrollment.course_start_date && (
+                                          <Typography variant="body2" color="text.secondary">
+                                            Start Date: {formatDateForDisplay(enrollment.course_start_date)}
+                                          </Typography>
+                                        )}
+                                        {enrollment.course_end_date && (
+                                          <Typography variant="body2" color="text.secondary">
+                                            Completion Date: {formatDateForDisplay(enrollment.course_end_date)}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                      <Box display="flex" flexDirection="column" alignItems="flex-end" gap={1}>
+                                        <Chip
+                                          label={enrollment.status || 'Enrolled'}
+                                          color={
+                                            enrollment.status === 'Completed' ? 'success' :
+                                            enrollment.status === 'In Progress' ? 'info' :
+                                            enrollment.status === 'Withdrawn' ? 'error' :
+                                            'default'
+                                          }
+                                          size="small"
+                                        />
+                                        {enrollment.completion_rate !== null && enrollment.completion_rate !== undefined && (
+                                          <Typography variant="body2" color="text.secondary">
+                                            Completion: {enrollment.completion_rate}%
+                                          </Typography>
+                                        )}
+                                        {enrollment.score !== null && enrollment.score !== undefined && (
+                                          <Typography variant="body2" color="text.secondary">
+                                            Score: {enrollment.score}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    </Box>
+                                  </Card>
+                                ))}
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                No course history available
+                              </Typography>
+                            )}
+                          </Box>
+                        </Collapse>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Card>
+      )}
 
       {/* Restore Employee Confirmation Dialog */}
       <Dialog

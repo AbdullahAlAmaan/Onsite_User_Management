@@ -92,6 +92,55 @@ export const formatDateRange = (startDate, endDate) => {
 };
 
 /**
+ * Format a date range with "from X to Y" format (e.g., "from 14 Nov 2025 to 12 Dec 2025")
+ * @param {Date|string} startDate - Start date
+ * @param {Date|string} endDate - End date (optional)
+ * @returns {string} - Formatted date range string with "from" and "to"
+ */
+export const formatDateRangeWithFromTo = (startDate, endDate) => {
+  if (!startDate) return 'N/A';
+  
+  const startStr = formatDateForDisplay(startDate);
+  
+  if (!endDate) {
+    return `from ${startStr}`;
+  }
+  
+  const endStr = formatDateForDisplay(endDate);
+  return `from ${startStr} to ${endStr}`;
+};
+
+/**
+ * Convert 24-hour time format (HH:MM) to 12-hour format (h:MM AM/PM)
+ * @param {string} time24 - Time in 24-hour format (e.g., "14:30" or "09:00")
+ * @returns {string} - Time in 12-hour format (e.g., "2:30 PM" or "9:00 AM")
+ */
+export const convertTo12HourFormat = (time24) => {
+  if (!time24) return '';
+  
+  try {
+    const [hours, minutes] = time24.split(':');
+    const hour24 = parseInt(hours, 10);
+    const mins = minutes || '00';
+    
+    if (isNaN(hour24)) return time24;
+    
+    if (hour24 === 0) {
+      return `12:${mins} AM`;
+    } else if (hour24 < 12) {
+      return `${hour24}:${mins} AM`;
+    } else if (hour24 === 12) {
+      return `12:${mins} PM`;
+    } else {
+      return `${hour24 - 12}:${mins} PM`;
+    }
+  } catch (error) {
+    console.error('Error converting time format:', error);
+    return time24;
+  }
+};
+
+/**
  * Generate a safe filename with timestamp
  * @param {string} prefix - Filename prefix
  * @param {string} extension - File extension (e.g., '.xlsx')

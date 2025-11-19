@@ -39,6 +39,7 @@ class MentorResponse(MentorBase):
     created_at: datetime
     updated_at: datetime
     student: Optional[StudentResponse] = None
+    course_count: Optional[int] = 0  # Number of courses this mentor has been assigned to
     
     class Config:
         from_attributes = True
