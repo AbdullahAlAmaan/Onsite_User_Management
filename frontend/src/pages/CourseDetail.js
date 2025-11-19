@@ -898,6 +898,14 @@ function CourseDetail() {
     return mentorCost + foodCost + otherCost;
   };
 
+  const formatCurrency = (value) => {
+    const numericValue = Number(value || 0);
+    if (Number.isNaN(numericValue)) {
+      return '0';
+    }
+    return numericValue.toLocaleString('en-US', { minimumFractionDigits: 0 });
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -1018,99 +1026,65 @@ function CourseDetail() {
 
         <CardContent sx={{ p: 3 }}>
           {/* Key Metrics Row */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                }}
-              >
-                <Box display="flex" alignItems="center" gap={1} mb={1}>
-                  <People color="primary" />
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    Enrollment
-                  </Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                  {course.current_enrolled}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  of {course.seat_limit} seats
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.success.main, 0.08),
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-                }}
-              >
-                <Box display="flex" alignItems="center" gap={1} mb={1}>
-                  <Event color="success" />
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    Classes
-                  </Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
-                  {course.total_classes_offered || 'N/A'}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Total classes
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.info.main, 0.08),
-                  border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                }}
-              >
-                <Box display="flex" alignItems="center" gap={1} mb={1}>
-                  <Person color="info" />
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    Mentors
-                  </Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'info.main' }}>
-                  {course.mentors?.length || 0}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Assigned mentors
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.warning.main, 0.08),
-                  border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
-                }}
-              >
-                <Box display="flex" alignItems="center" gap={1} mb={1}>
-                  <AccountBalance color="warning" />
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    Total Cost
-                  </Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'warning.main' }}>
-                  Tk {calculateTotalTrainingCost().toFixed(0)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Training cost
-                </Typography>
-              </Box>
-            </Grid>
+          <Grid container spacing={2} sx={{ mb: 4 }}>
+            {[
+              {
+                label: 'Enrollment',
+                value: `${course.current_enrolled}/${course.seat_limit}`,
+                helper: course.seat_limit
+                  ? `${Math.min(100, Math.round((course.current_enrolled / course.seat_limit) * 100))}% seats filled`
+                  : 'Seat limit not set',
+                icon: <People color="primary" />,
+                border: alpha(theme.palette.primary.main, 0.2),
+              },
+              {
+                label: 'Classes',
+                value: course.total_classes_offered || 'N/A',
+                helper: 'Total sessions planned',
+                icon: <Event color="success" />,
+                border: alpha(theme.palette.success.main, 0.2),
+              },
+              {
+                label: 'Mentors',
+                value: course.mentors?.length || 0,
+                helper: 'Assigned mentors',
+                icon: <Person color="info" />,
+                border: alpha(theme.palette.info.main, 0.2),
+              },
+              {
+                label: 'Total Cost',
+                value: `Tk ${formatCurrency(calculateTotalTrainingCost())}`,
+                helper: 'Training cost',
+                icon: <AccountBalance color="warning" />,
+                border: alpha(theme.palette.warning.main, 0.2),
+              },
+            ].map((metric) => (
+              <Grid item xs={12} sm={6} md={3} key={metric.label}>
+                <Card
+                  variant="outlined"
+                  sx={{
+                    height: '100%',
+                    borderRadius: 2,
+                    borderColor: metric.border,
+                  }}
+                >
+                  <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      {metric.icon}
+                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                        {metric.label}
+                      </Typography>
+                    </Box>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {metric.value}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {metric.helper}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
           </Grid>
 
           {/* Course Information Section */}
@@ -1140,84 +1114,84 @@ function CourseDetail() {
                 Edit Course Details
               </Button>
             </Box>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                  }}
-                >
-                  <Box display="flex" alignItems="center" gap={1} mb={1}>
-                    <Event fontSize="small" color="primary" />
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      Start Date
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 600 }}>
+                      Timeline
                     </Typography>
-                  </Box>
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    {course.start_date}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.secondary.main, 0.05),
-                    border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
-                  }}
-                >
-                  <Box display="flex" alignItems="center" gap={1} mb={1}>
-                    <Event fontSize="small" color="secondary" />
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      End Date
-                    </Typography>
-                  </Box>
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    {course.end_date || 'Not set'}
-                  </Typography>
-                </Box>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">
+                          Start Date
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {course.start_date}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">
+                          End Date
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {course.end_date || 'Not set'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">
+                          Status
+                        </Typography>
+                        <Chip
+                          label={course.status?.toUpperCase()}
+                          color={
+                            course.status === 'completed'
+                              ? 'success'
+                              : course.status === 'ongoing'
+                              ? 'primary'
+                              : 'warning'
+                          }
+                          sx={{ mt: 0.5, fontWeight: 600 }}
+                          size="small"
+                        />
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">
+                          Total Classes
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {course.total_classes_offered || 'N/A'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                    
+                    {/* Class Schedule inside Timeline */}
+                    {course.class_schedule && course.class_schedule.length > 0 && (
+                      <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                        <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+                          <AccessTime fontSize="small" color="primary" />
+                          <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                            Class Schedule
+                          </Typography>
+                        </Box>
+                        <Box display="flex" flexWrap="wrap" gap={1}>
+                          {course.class_schedule.map((schedule, index) => (
+                            <Chip
+                              key={`${schedule.day}-${index}`}
+                              label={`${schedule.day} ${schedule.start_time} - ${schedule.end_time}`}
+                              color="primary"
+                              variant="outlined"
+                              sx={{ fontWeight: 500 }}
+                              size="small"
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
               </Grid>
             </Grid>
-            
-            {/* Class Schedule Display */}
-            {course.class_schedule && course.class_schedule.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Box display="flex" alignItems="center" gap={1} mb={2}>
-                  <AccessTime color="primary" />
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Class Schedule
-                  </Typography>
-                </Box>
-                <Box display="flex" flexDirection="column" gap={1.5}>
-                  {course.class_schedule.map((schedule, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        p: 2,
-                        borderRadius: 2,
-                        backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                      }}
-                    >
-                      <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                        <Chip 
-                          label={schedule.day} 
-                          color="primary" 
-                          sx={{ fontWeight: 600 }}
-                        />
-                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                          {schedule.start_time} - {schedule.end_time}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            )}
           </Box>
 
           {/* Assigned Mentors Section */}
@@ -1397,10 +1371,10 @@ function CourseDetail() {
             })()}
           </Box>
 
-          {/* Course Costs Section */}
+          {/* Course Costs Section - Accounting Books Layout */}
           <Divider sx={{ my: 3 }} />
           <Box>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} flexWrap="wrap" gap={2}>
               <Box display="flex" alignItems="center" gap={1}>
                 <AccountBalance color="primary" />
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -1416,101 +1390,99 @@ function CourseDetail() {
                 Edit Costs
               </Button>
             </Box>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
+            
+            {/* Accounting Books Layout - Stacked vertically */}
+            <Card variant="outlined" sx={{ borderRadius: 2 }}>
+              <CardContent sx={{ p: 0 }}>
+                {/* Total Mentor Costs */}
                 <Box
                   sx={{
                     p: 2.5,
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                    height: '100%',
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <Box display="flex" alignItems="center" gap={1.5} mb={2}>
-                  
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Person color="primary" sx={{ fontSize: 24 }} />
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       Total Mentor Costs
                     </Typography>
                   </Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
                     Tk {calculateTotalMentorCost().toFixed(2)}
                   </Typography>
                 </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
+                
+                {/* Food Cost */}
                 <Box
                   sx={{
                     p: 2.5,
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.success.main, 0.08),
-                    border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-                    height: '100%',
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <Box display="flex" alignItems="center" gap={1.5} mb={2}>
-                    <Restaurant color="success" sx={{ fontSize: 28 }} />
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Restaurant color="success" sx={{ fontSize: 24 }} />
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       Food Cost
                     </Typography>
                   </Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: 'success.main' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main' }}>
                     Tk {parseFloat((course?.status === 'draft' && course?.draft?.food_cost !== null && course?.draft?.food_cost !== undefined) 
                       ? course.draft.food_cost 
                       : (course?.food_cost || 0)).toFixed(2)}
                   </Typography>
                 </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
+                
+                {/* Other Cost */}
                 <Box
                   sx={{
                     p: 2.5,
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.info.main, 0.08),
-                    border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                    height: '100%',
+                    borderBottom: `2px solid ${theme.palette.primary.main}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <Box display="flex" alignItems="center" gap={1.5} mb={2}>
-                    <Receipt color="info" sx={{ fontSize: 28 }} />
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Receipt color="info" sx={{ fontSize: 24 }} />
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       Other Cost
                     </Typography>
                   </Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: 'info.main' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'info.main' }}>
                     Tk {parseFloat((course?.status === 'draft' && course?.draft?.other_cost !== null && course?.draft?.other_cost !== undefined) 
                       ? course.draft.other_cost 
                       : (course?.other_cost || 0)).toFixed(2)}
                   </Typography>
                 </Box>
-              </Grid>
-              <Grid item xs={12}>
+                
+                {/* Total Training Cost - Final Sum */}
                 <Box
                   sx={{
                     p: 3,
-                    borderRadius: 2,
-                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
-                    border: `2px solid ${theme.palette.primary.main}`,
-                    mt: 2,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Calculate color="primary" sx={{ fontSize: 32 }} />
-                      <Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          Total Training Cost
-                        </Typography>
-                        <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                          Tk {calculateTotalTrainingCost().toFixed(2)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <TrendingUp sx={{ fontSize: 40, color: 'primary.main', opacity: 0.7 }} />
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Calculate color="primary" sx={{ fontSize: 28 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                      Total Training Cost
+                    </Typography>
                   </Box>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                    Tk {calculateTotalTrainingCost().toFixed(2)}
+                  </Typography>
                 </Box>
-              </Grid>
-            </Grid>
+              </CardContent>
+            </Card>
           </Box>
         </CardContent>
       </Card>
