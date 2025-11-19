@@ -74,7 +74,10 @@ import {
 import UserDetailsDialog from '../components/UserDetailsDialog';
 import AssignInternalMentorDialog from '../components/AssignInternalMentorDialog';
 import AddExternalMentorDialog from '../components/AddExternalMentorDialog';
-import { formatDateTimeForDisplay } from '../utils/dateUtils';
+import { formatDateTimeForDisplay, formatDateForAPI } from '../utils/dateUtils';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 function CourseDetail() {
   const theme = useTheme();
@@ -163,6 +166,17 @@ function CourseDetail() {
   // User details
   const [userDetailsOpen, setUserDetailsOpen] = useState(false);
   const [selectedUserEnrollment, setSelectedUserEnrollment] = useState(null);
+  
+  // Edit course details
+  const [editCourseDialogOpen, setEditCourseDialogOpen] = useState(false);
+  const [editCourseData, setEditCourseData] = useState({
+    start_date: null,
+    end_date: null,
+    seat_limit: 0,
+    total_classes_offered: '',
+  });
+  const [editClassSchedule, setEditClassSchedule] = useState([]);
+  const [editCourseLoading, setEditCourseLoading] = useState(false);
 
   useEffect(() => {
     if (courseId) {
@@ -1101,11 +1115,30 @@ function CourseDetail() {
 
           {/* Course Information Section */}
           <Box sx={{ mb: 4 }}>
-            <Box display="flex" alignItems="center" gap={1} mb={2}>
-              <CalendarToday color="primary" />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Course Schedule
-              </Typography>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+              <Box display="flex" alignItems="center" gap={1}>
+                <CalendarToday color="primary" />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Course Schedule
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Edit />}
+                onClick={() => {
+                  setEditCourseData({
+                    start_date: course.start_date ? new Date(course.start_date) : null,
+                    end_date: course.end_date ? new Date(course.end_date) : null,
+                    seat_limit: course.seat_limit || 0,
+                    total_classes_offered: course.total_classes_offered || '',
+                  });
+                  setEditClassSchedule(course.class_schedule || []);
+                  setEditCourseDialogOpen(true);
+                }}
+              >
+                Edit Course Details
+              </Button>
             </Box>
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
@@ -1149,6 +1182,42 @@ function CourseDetail() {
                 </Box>
               </Grid>
             </Grid>
+            
+            {/* Class Schedule Display */}
+            {course.class_schedule && course.class_schedule.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <AccessTime color="primary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Class Schedule
+                  </Typography>
+                </Box>
+                <Box display="flex" flexDirection="column" gap={1.5}>
+                  {course.class_schedule.map((schedule, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                      }}
+                    >
+                      <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+                        <Chip 
+                          label={schedule.day} 
+                          color="primary" 
+                          sx={{ fontWeight: 600 }}
+                        />
+                        <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                          {schedule.start_time} - {schedule.end_time}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
           </Box>
 
           {/* Assigned Mentors Section */}
@@ -2136,6 +2205,181 @@ function CourseDetail() {
         </DialogActions>
       </Dialog>
 
+      {/* Edit Course Details Dialog */}
+      <Dialog open={editCourseDialogOpen} onClose={() => setEditCourseDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Edit Course Details</DialogTitle>
+        <DialogContent>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                label="Start Date"
+                value={editCourseData.start_date}
+                onChange={(newValue) => setEditCourseData({ ...editCourseData, start_date: newValue })}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    required: true,
+                  },
+                }}
+              />
+              <DatePicker
+                label="End Date"
+                value={editCourseData.end_date}
+                onChange={(newValue) => setEditCourseData({ ...editCourseData, end_date: newValue })}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                  },
+                }}
+              />
+            </LocalizationProvider>
+            <TextField
+              label="Seat Limit"
+              type="number"
+              value={editCourseData.seat_limit}
+              onChange={(e) => setEditCourseData({ ...editCourseData, seat_limit: parseInt(e.target.value) || 0 })}
+              fullWidth
+              required
+              inputProps={{ min: 0 }}
+            />
+            <TextField
+              label="Total Classes Offered"
+              type="number"
+              value={editCourseData.total_classes_offered}
+              onChange={(e) => setEditCourseData({ ...editCourseData, total_classes_offered: e.target.value })}
+              fullWidth
+              helperText="Used for calculating attendance percentage"
+              inputProps={{ min: 0 }}
+            />
+            
+            <Divider sx={{ my: 2 }} />
+            
+            {/* Class Schedule Section */}
+            <Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <AccessTime color="primary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Class Schedule
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() => setEditClassSchedule([...editClassSchedule, { day: '', start_time: '', end_time: '' }])}
+                >
+                  Add Schedule
+                </Button>
+              </Box>
+              
+              {editClassSchedule.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  No schedule added. Click "Add Schedule" to specify class days and times.
+                </Typography>
+              ) : (
+                <Box display="flex" flexDirection="column" gap={2}>
+                  {editClassSchedule.map((schedule, index) => (
+                    <Card key={index} variant="outlined" sx={{ p: 2 }}>
+                      <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+                        <TextField
+                          select
+                          label="Day"
+                          value={schedule.day}
+                          onChange={(e) => {
+                            const updated = [...editClassSchedule];
+                            updated[index].day = e.target.value;
+                            setEditClassSchedule(updated);
+                          }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        >
+                          <MenuItem value="Monday">Monday</MenuItem>
+                          <MenuItem value="Tuesday">Tuesday</MenuItem>
+                          <MenuItem value="Wednesday">Wednesday</MenuItem>
+                          <MenuItem value="Thursday">Thursday</MenuItem>
+                          <MenuItem value="Friday">Friday</MenuItem>
+                          <MenuItem value="Saturday">Saturday</MenuItem>
+                          <MenuItem value="Sunday">Sunday</MenuItem>
+                        </TextField>
+                        <TextField
+                          label="Start Time"
+                          type="time"
+                          value={schedule.start_time}
+                          onChange={(e) => {
+                            const updated = [...editClassSchedule];
+                            updated[index].start_time = e.target.value;
+                            setEditClassSchedule(updated);
+                          }}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        />
+                        <TextField
+                          label="End Time"
+                          type="time"
+                          value={schedule.end_time}
+                          onChange={(e) => {
+                            const updated = [...editClassSchedule];
+                            updated[index].end_time = e.target.value;
+                            setEditClassSchedule(updated);
+                          }}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        />
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setEditClassSchedule(editClassSchedule.filter((_, i) => i !== index))}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Card>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditCourseDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={async () => {
+              if (!editCourseData.start_date || editCourseData.seat_limit <= 0) {
+                setMessage({ type: 'error', text: 'Please fill in all required fields' });
+                return;
+              }
+              
+              setEditCourseLoading(true);
+              try {
+                await coursesAPI.update(courseId, {
+                  start_date: formatDateForAPI(editCourseData.start_date),
+                  end_date: formatDateForAPI(editCourseData.end_date),
+                  seat_limit: editCourseData.seat_limit,
+                  total_classes_offered: editCourseData.total_classes_offered ? parseInt(editCourseData.total_classes_offered) : null,
+                  class_schedule: editClassSchedule.length > 0 ? editClassSchedule : null,
+                });
+                
+                setMessage({ type: 'success', text: 'Course details updated successfully' });
+                setEditCourseDialogOpen(false);
+                fetchCourse();
+              } catch (error) {
+                console.error('Error updating course:', error);
+                setMessage({ type: 'error', text: error.response?.data?.detail || 'Error updating course details' });
+              } finally {
+                setEditCourseLoading(false);
+              }
+            }}
+            variant="contained"
+            disabled={editCourseLoading || !editCourseData.start_date || editCourseData.seat_limit <= 0}
+          >
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 }
@@ -2220,7 +2464,7 @@ function EnrollmentTable({
                       </IconButton>
                     )}
                     {onWithdraw && (
-                      <IconButton size="small" color="warning" onClick={() => onWithdraw(enrollment)}>
+                      <IconButton size="small" color="error" onClick={() => onWithdraw(enrollment)}>
                         <PersonRemove fontSize="small" />
                       </IconButton>
                     )}

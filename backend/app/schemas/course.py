@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from decimal import Decimal
 from app.schemas.course_mentor import CourseMentorResponse
@@ -17,15 +17,19 @@ class CourseCreate(BaseModel):
     total_classes_offered: Optional[int] = None
     prerequisite_course_id: Optional[int] = None
     status: Optional[CourseStatus] = CourseStatus.DRAFT  # Default to draft for planning courses
+    class_schedule: Optional[List[Dict[str, str]]] = None  # Array of {day, start_time, end_time}
 
 class CourseUpdate(BaseModel):
     name: Optional[str] = None
+    batch_code: Optional[str] = None
     description: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     seat_limit: Optional[int] = None
     total_classes_offered: Optional[int] = None
     prerequisite_course_id: Optional[int] = None
+    status: Optional[CourseStatus] = None
+    class_schedule: Optional[List[Dict[str, str]]] = None  # Array of {day, start_time, end_time}
 
 class CourseCostUpdate(BaseModel):
     food_cost: Optional[Decimal] = None
@@ -46,6 +50,7 @@ class CourseResponse(BaseModel):
     status: CourseStatus
     food_cost: Decimal
     other_cost: Decimal
+    class_schedule: Optional[List[Dict[str, str]]] = None  # Array of {day, start_time, end_time}
     total_training_cost: Optional[Decimal] = None  # Computed server-side
     mentors: Optional[List[CourseMentorResponse]] = None
     comments: Optional[List[CourseCommentResponse]] = None

@@ -75,8 +75,24 @@ def get_courses(
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db)
 ):
-    """Get all courses."""
+    """Get all courses. Automatically updates course status from ongoing to completed if end_date has passed."""
     try:
+        # Auto-update course status: if end_date is reached (today or past) and status is ongoing, change to completed
+        today = date.today()
+        courses_to_update = db.query(Course).filter(
+            Course.status == CourseStatus.ONGOING,
+            Course.end_date.isnot(None),
+            Course.end_date <= today
+        ).all()
+        
+        for course in courses_to_update:
+            course.status = CourseStatus.COMPLETED
+            course.updated_at = datetime.utcnow()
+        
+        if courses_to_update:
+            db.commit()
+            print(f"Auto-updated {len(courses_to_update)} course(s) from ongoing to completed based on end_date")
+        
         # Try to load courses with mentors relationship
         # If that fails, fall back to loading mentors separately
         from sqlalchemy.orm import selectinload, joinedload
@@ -177,6 +193,7 @@ def get_courses(
                     'status': course.status if hasattr(course, 'status') and course.status else CourseStatus.DRAFT,
                     'food_cost': food_cost_decimal,
                     'other_cost': other_cost_decimal,
+                    'class_schedule': course.class_schedule if hasattr(course, 'class_schedule') else None,
                     'total_training_cost': Decimal(str(total_training_cost)),
                     'mentors': mentors_list if mentors_list else None,
                     'comments': [CourseCommentResponse.from_orm(c) for c in comments_list] if comments_list else None,
@@ -239,6 +256,7 @@ def get_course(course_id: int, db: Session = Depends(get_db)):
         'status': course.status if hasattr(course, 'status') and course.status else CourseStatus.DRAFT,
         'food_cost': Decimal(str(course.food_cost)) if course.food_cost is not None else Decimal('0'),
         'other_cost': Decimal(str(course.other_cost)) if course.other_cost is not None else Decimal('0'),
+        'class_schedule': course.class_schedule if hasattr(course, 'class_schedule') else None,
         'total_training_cost': Decimal(str(total_training_cost)),
         'mentors': [CourseMentorResponse.from_orm(cm) for cm in course_mentors] if course_mentors else None,
         'comments': [CourseCommentResponse.from_orm(c) for c in course.comments] if course.comments else None,

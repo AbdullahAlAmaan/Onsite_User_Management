@@ -31,7 +31,7 @@ import {
   FormControlLabel,
   Checkbox,
 } from '@mui/material';
-import { Add, Delete, Search, Download, PersonAdd, CheckCircle } from '@mui/icons-material';
+import { Add, Delete, Search, Download, PersonAdd, CheckCircle, Edit, AccessTime } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -64,21 +64,24 @@ function Courses({ status = 'ongoing' }) {
     total_classes_offered: '',
     prerequisite_course_id: null,
   });
+  const [classSchedule, setClassSchedule] = useState([]); // Array of {day, start_time, end_time}
   const [prerequisiteCourses, setPrerequisiteCourses] = useState([]);
   const [selectedMentors, setSelectedMentors] = useState([]); // Array of { mentor_id, hours_taught, amount_paid, mentor_name, is_internal }
   const [assignInternalMentorDialogOpen, setAssignInternalMentorDialogOpen] = useState(false);
   const [addExternalMentorDialogOpen, setAddExternalMentorDialogOpen] = useState(false);
   const [createAsDraft, setCreateAsDraft] = useState(true); // Default to planning/draft
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null);
 
   useEffect(() => {
     fetchCourses();
   }, [status]);
 
   useEffect(() => {
-    if (open) {
+    if (open || editDialogOpen) {
       fetchPrerequisiteCourses();
     }
-  }, [open]);
+  }, [open, editDialogOpen]);
 
 
   const fetchCourses = async () => {
@@ -178,6 +181,7 @@ function Courses({ status = 'ongoing' }) {
       prerequisite_course_id: null,
     });
     setSelectedMentors([]);
+    setClassSchedule([]);
     setCreateAsDraft(true); // Default to planning/draft
     setOpen(true);
   };
@@ -195,6 +199,7 @@ function Courses({ status = 'ongoing' }) {
       prerequisite_course_id: null,
     });
     setSelectedMentors([]);
+    setClassSchedule([]);
     setCreateAsDraft(true); // Reset to default
   };
 
@@ -211,6 +216,7 @@ function Courses({ status = 'ongoing' }) {
         total_classes_offered: formData.total_classes_offered ? parseInt(formData.total_classes_offered) : null,
         prerequisite_course_id: formData.prerequisite_course_id || null,
         status: courseStatus,
+        class_schedule: classSchedule.length > 0 ? classSchedule : null,
       });
       
       const courseId = response.data.id;
@@ -377,6 +383,65 @@ function Courses({ status = 'ongoing' }) {
       fetchCourses();
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Error approving course' });
+    }
+  };
+
+  const handleEdit = (course) => {
+    setEditingCourse(course);
+    setFormData({
+      name: course.name || '',
+      batch_code: course.batch_code || '',
+      description: course.description || '',
+      start_date: course.start_date ? new Date(course.start_date) : null,
+      end_date: course.end_date ? new Date(course.end_date) : null,
+      seat_limit: course.seat_limit || 0,
+      total_classes_offered: course.total_classes_offered || '',
+      prerequisite_course_id: course.prerequisite_course_id || null,
+    });
+    setClassSchedule(course.class_schedule || []);
+    setSelectedMentors([]); // Mentors are managed separately in course detail page
+    setEditDialogOpen(true);
+  };
+
+  const handleEditClose = () => {
+    setEditDialogOpen(false);
+    setEditingCourse(null);
+    setFormData({
+      name: '',
+      batch_code: '',
+      description: '',
+      start_date: null,
+      end_date: null,
+      seat_limit: 0,
+      total_classes_offered: '',
+      prerequisite_course_id: null,
+    });
+    setClassSchedule([]);
+    setSelectedMentors([]);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingCourse) return;
+    
+    try {
+      await coursesAPI.update(editingCourse.id, {
+        name: formData.name,
+        batch_code: formData.batch_code,
+        description: formData.description,
+        start_date: formatDateForAPI(formData.start_date),
+        end_date: formatDateForAPI(formData.end_date),
+        seat_limit: formData.seat_limit,
+        total_classes_offered: formData.total_classes_offered ? parseInt(formData.total_classes_offered) : null,
+        prerequisite_course_id: formData.prerequisite_course_id || null,
+        class_schedule: classSchedule.length > 0 ? classSchedule : null,
+      });
+      
+      handleEditClose();
+      fetchCourses();
+      setMessage({ type: 'success', text: 'Course updated successfully' });
+    } catch (error) {
+      console.error('Error updating course:', error);
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Error updating course' });
     }
   };
 
@@ -622,6 +687,14 @@ function Courses({ status = 'ongoing' }) {
                       <Box display="flex" gap={1}>
                         <IconButton
                           color="primary"
+                          onClick={() => handleEdit(course)}
+                          title="Edit Course"
+                          size="small"
+                        >
+                          <Edit />
+                        </IconButton>
+                        <IconButton
+                          color="primary"
                           onClick={() => handleGenerateReport(course.id)}
                           title="Generate Report"
                                                   size="small"
@@ -659,6 +732,192 @@ function Courses({ status = 'ongoing' }) {
         </Card>
         </>
       )}
+
+      {/* Edit Course Dialog */}
+      <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600 }}>Edit Course</DialogTitle>
+        <DialogContent>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            <TextField
+              label="Course Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              fullWidth
+              required
+            />
+            <TextField
+              label="Batch Code"
+              value={formData.batch_code}
+              onChange={(e) => setFormData({ ...formData, batch_code: e.target.value })}
+              fullWidth
+              required
+            />
+            <TextField
+              label="Description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              fullWidth
+              multiline
+              rows={3}
+            />
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                label="Start Date"
+                value={formData.start_date}
+                onChange={(newValue) => setFormData({ ...formData, start_date: newValue })}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    required: true,
+                  },
+                }}
+              />
+              <DatePicker
+                label="End Date"
+                value={formData.end_date}
+                onChange={(newValue) => setFormData({ ...formData, end_date: newValue })}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                  },
+                }}
+              />
+            </LocalizationProvider>
+            <TextField
+              label="Seat Limit"
+              type="number"
+              value={formData.seat_limit}
+              onChange={(e) => setFormData({ ...formData, seat_limit: parseInt(e.target.value) || 0 })}
+              fullWidth
+              required
+              inputProps={{ min: 0 }}
+            />
+            <TextField
+              label="Total Classes Offered"
+              type="number"
+              value={formData.total_classes_offered}
+              onChange={(e) => setFormData({ ...formData, total_classes_offered: e.target.value })}
+              fullWidth
+              helperText="Used for calculating attendance percentage"
+              inputProps={{ min: 0 }}
+            />
+            <TextField
+              select
+              label="Prerequisite Course"
+              value={formData.prerequisite_course_id || ''}
+              onChange={(e) => setFormData({ ...formData, prerequisite_course_id: e.target.value || null })}
+              fullWidth
+            >
+              <MenuItem value="">None</MenuItem>
+              {prerequisiteCourses.filter(c => c.id !== editingCourse?.id).map((course) => (
+                <MenuItem key={course.id} value={course.id}>
+                  {course.name} ({course.batch_code})
+                </MenuItem>
+              ))}
+            </TextField>
+            
+            <Divider sx={{ my: 2 }} />
+            
+            {/* Class Schedule Section */}
+            <Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <AccessTime color="primary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Class Schedule
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() => setClassSchedule([...classSchedule, { day: '', start_time: '', end_time: '' }])}
+                >
+                  Add Schedule
+                </Button>
+              </Box>
+              
+              {classSchedule.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  No schedule added. Click "Add Schedule" to specify class days and times.
+                </Typography>
+              ) : (
+                <Box display="flex" flexDirection="column" gap={2}>
+                  {classSchedule.map((schedule, index) => (
+                    <Card key={index} variant="outlined" sx={{ p: 2 }}>
+                      <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+                        <TextField
+                          select
+                          label="Day"
+                          value={schedule.day}
+                          onChange={(e) => {
+                            const updated = [...classSchedule];
+                            updated[index].day = e.target.value;
+                            setClassSchedule(updated);
+                          }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        >
+                          <MenuItem value="Monday">Monday</MenuItem>
+                          <MenuItem value="Tuesday">Tuesday</MenuItem>
+                          <MenuItem value="Wednesday">Wednesday</MenuItem>
+                          <MenuItem value="Thursday">Thursday</MenuItem>
+                          <MenuItem value="Friday">Friday</MenuItem>
+                          <MenuItem value="Saturday">Saturday</MenuItem>
+                          <MenuItem value="Sunday">Sunday</MenuItem>
+                        </TextField>
+                        <TextField
+                          label="Start Time"
+                          type="time"
+                          value={schedule.start_time}
+                          onChange={(e) => {
+                            const updated = [...classSchedule];
+                            updated[index].start_time = e.target.value;
+                            setClassSchedule(updated);
+                          }}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        />
+                        <TextField
+                          label="End Time"
+                          type="time"
+                          value={schedule.end_time}
+                          onChange={(e) => {
+                            const updated = [...classSchedule];
+                            updated[index].end_time = e.target.value;
+                            setClassSchedule(updated);
+                          }}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        />
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setClassSchedule(classSchedule.filter((_, i) => i !== index))}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Card>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditClose}>Cancel</Button>
+          <Button
+            onClick={handleEditSubmit}
+            variant="contained"
+            disabled={!formData.name || !formData.batch_code || !formData.start_date || formData.seat_limit <= 0}
+          >
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Create Course Dialog */}
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
@@ -742,6 +1001,96 @@ function Courses({ status = 'ongoing' }) {
                         </MenuItem>
                       ))}
                   </TextField>
+            
+            <Divider sx={{ my: 2 }} />
+            
+            {/* Class Schedule Section */}
+            <Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <AccessTime color="primary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Class Schedule
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() => setClassSchedule([...classSchedule, { day: '', start_time: '', end_time: '' }])}
+                >
+                  Add Schedule
+                </Button>
+              </Box>
+              
+              {classSchedule.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  No schedule added. Click "Add Schedule" to specify class days and times.
+                </Typography>
+              ) : (
+                <Box display="flex" flexDirection="column" gap={2}>
+                  {classSchedule.map((schedule, index) => (
+                    <Card key={index} variant="outlined" sx={{ p: 2 }}>
+                      <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+                        <TextField
+                          select
+                          label="Day"
+                          value={schedule.day}
+                          onChange={(e) => {
+                            const updated = [...classSchedule];
+                            updated[index].day = e.target.value;
+                            setClassSchedule(updated);
+                          }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        >
+                          <MenuItem value="Monday">Monday</MenuItem>
+                          <MenuItem value="Tuesday">Tuesday</MenuItem>
+                          <MenuItem value="Wednesday">Wednesday</MenuItem>
+                          <MenuItem value="Thursday">Thursday</MenuItem>
+                          <MenuItem value="Friday">Friday</MenuItem>
+                          <MenuItem value="Saturday">Saturday</MenuItem>
+                          <MenuItem value="Sunday">Sunday</MenuItem>
+                        </TextField>
+                        <TextField
+                          label="Start Time"
+                          type="time"
+                          value={schedule.start_time}
+                          onChange={(e) => {
+                            const updated = [...classSchedule];
+                            updated[index].start_time = e.target.value;
+                            setClassSchedule(updated);
+                          }}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        />
+                        <TextField
+                          label="End Time"
+                          type="time"
+                          value={schedule.end_time}
+                          onChange={(e) => {
+                            const updated = [...classSchedule];
+                            updated[index].end_time = e.target.value;
+                            setClassSchedule(updated);
+                          }}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ minWidth: 150 }}
+                          required
+                        />
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setClassSchedule(classSchedule.filter((_, i) => i !== index))}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Card>
+                  ))}
+                </Box>
+              )}
+            </Box>
             
             <Divider sx={{ my: 2 }} />
             

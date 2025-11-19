@@ -32,11 +32,16 @@ import {
   PlayCircle,
   Event,
   CalendarToday,
+  AccessTime,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { studentsAPI, coursesAPI, enrollmentsAPI } from '../services/api';
 import { getCourseStatus } from '../utils/courseUtils';
 import { formatDateRange as formatDateRangeUtil, formatDateForDisplay } from '../utils/dateUtils';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 
 function Dashboard() {
   const theme = useTheme();
@@ -49,6 +54,8 @@ function Dashboard() {
   const [filteredOngoingCourses, setFilteredOngoingCourses] = useState([]);
   const [filteredPlanningCourses, setFilteredPlanningCourses] = useState([]);
   const [filteredCompletedCourses, setFilteredCompletedCourses] = useState([]);
+  const [todayClasses, setTodayClasses] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [stats, setStats] = useState({
     activeEmployees: 0,
     previousEmployees: 0,
@@ -270,6 +277,110 @@ function Dashboard() {
       setFilteredOngoingCourses(filteredOngoing);
       setFilteredPlanningCourses(filteredPlanning);
       setFilteredCompletedCourses(filteredCompleted);
+
+      // Get today's classes from all courses
+      const today = new Date();
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const todayDayName = dayNames[today.getDay()];
+      
+      const classesToday = [];
+      const events = [];
+      
+      // Convert class schedules to FullCalendar events
+      allCourses.forEach(course => {
+        const courseStatus = getCourseStatus(course);
+        
+        // Determine color based on course status
+        let eventColor = theme.palette.info.main; // Planning - blue
+        if (courseStatus === 'ongoing') {
+          eventColor = theme.palette.success.main; // Ongoing - green
+        } else if (courseStatus === 'completed') {
+          eventColor = theme.palette.warning.main; // Completed - orange
+        }
+        
+        if (course.class_schedule && Array.isArray(course.class_schedule)) {
+          course.class_schedule.forEach(schedule => {
+            // Get today's classes for the simple list
+            if (schedule.day === todayDayName) {
+              classesToday.push({
+                courseId: course.id,
+                courseName: course.name,
+                batchCode: course.batch_code,
+                day: schedule.day,
+                startTime: schedule.start_time,
+                endTime: schedule.end_time,
+                status: courseStatus,
+              });
+            }
+            
+            // Create recurring events for FullCalendar
+            // Map day names to FullCalendar day numbers (0=Sunday, 1=Monday, etc.)
+            const dayMap = {
+              'Sunday': 0,
+              'Monday': 1,
+              'Tuesday': 2,
+              'Wednesday': 3,
+              'Thursday': 4,
+              'Friday': 5,
+              'Saturday': 6
+            };
+            
+            const dayOfWeek = dayMap[schedule.day];
+            if (dayOfWeek !== undefined && schedule.start_time && schedule.end_time) {
+              // Create events for the next 3 months
+              const startDate = new Date();
+              startDate.setDate(startDate.getDate() - startDate.getDay()); // Start of current week
+              
+              for (let week = 0; week < 12; week++) {
+                const eventDate = new Date(startDate);
+                eventDate.setDate(eventDate.getDate() + (week * 7) + dayOfWeek);
+                
+                // Only create events if course is within date range
+                const courseStart = new Date(course.start_date);
+                const courseEnd = course.end_date ? new Date(course.end_date) : null;
+                
+                if (eventDate >= courseStart && (!courseEnd || eventDate <= courseEnd)) {
+                  const [startHour, startMin] = schedule.start_time.split(':').map(Number);
+                  const [endHour, endMin] = schedule.end_time.split(':').map(Number);
+                  
+                  const eventStart = new Date(eventDate);
+                  eventStart.setHours(startHour, startMin, 0, 0);
+                  
+                  const eventEnd = new Date(eventDate);
+                  eventEnd.setHours(endHour, endMin, 0, 0);
+                  
+                  events.push({
+                    id: `course-${course.id}-${schedule.day}-${week}`,
+                    title: `${course.name} (${course.batch_code})`,
+                    start: eventStart.toISOString(),
+                    end: eventEnd.toISOString(),
+                    backgroundColor: eventColor,
+                    borderColor: eventColor,
+                    textColor: '#ffffff',
+                    extendedProps: {
+                      courseId: course.id,
+                      courseName: course.name,
+                      batchCode: course.batch_code,
+                      status: courseStatus,
+                      time: `${schedule.start_time} - ${schedule.end_time}`,
+                    },
+                  });
+                }
+              }
+            }
+          });
+        }
+      });
+      
+      // Sort by start time
+      classesToday.sort((a, b) => {
+        const timeA = a.startTime || '00:00';
+        const timeB = b.startTime || '00:00';
+        return timeA.localeCompare(timeB);
+      });
+      
+      setTodayClasses(classesToday);
+      setCalendarEvents(events);
 
       // Fetch dashboard statistics from backend
       const statsRes = await enrollmentsAPI.getDashboardStats();
@@ -523,6 +634,168 @@ function Dashboard() {
             subtitle={timePeriod !== 'all' ? formatDateRange() : 'Finished'}
             courses={filteredCompletedCourses}
           />
+        </Grid>
+      </Grid>
+
+      {/* FullCalendar */}
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Card
+            sx={{
+              border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+            }}
+          >
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      backgroundColor: alpha(theme.palette.primary.main, 0.15),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <CalendarToday sx={{ fontSize: 32, color: theme.palette.primary.main }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
+                      Class Schedule Calendar
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      View all scheduled classes across all courses
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box display="flex" gap={1}>
+                  <Chip
+                    label="Planning"
+                    size="small"
+                    sx={{
+                      backgroundColor: alpha(theme.palette.info.main, 0.2),
+                      color: theme.palette.info.main,
+                      fontWeight: 600,
+                      border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+                    }}
+                  />
+                  <Chip
+                    label="Ongoing"
+                    size="small"
+                    sx={{
+                      backgroundColor: alpha(theme.palette.success.main, 0.2),
+                      color: theme.palette.success.main,
+                      fontWeight: 600,
+                      border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+                    }}
+                  />
+                  <Chip
+                    label="Completed"
+                    size="small"
+                    sx={{
+                      backgroundColor: alpha(theme.palette.warning.main, 0.2),
+                      color: theme.palette.warning.main,
+                      fontWeight: 600,
+                      border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              <Box sx={{ 
+                '& .fc': { 
+                  fontFamily: theme.typography.fontFamily,
+                },
+                '& .fc-header-toolbar': {
+                  marginBottom: theme.spacing(1),
+                  padding: theme.spacing(1),
+                },
+                '& .fc-toolbar-title': {
+                  fontSize: '1.25rem !important',
+                },
+                '& .fc-button': {
+                  backgroundColor: theme.palette.primary.main,
+                  borderColor: theme.palette.primary.main,
+                  padding: theme.spacing(0.5, 1),
+                  fontSize: '0.875rem',
+                  '&:hover': {
+                    backgroundColor: theme.palette.primary.dark,
+                    borderColor: theme.palette.primary.dark,
+                  },
+                },
+                '& .fc-button-active': {
+                  backgroundColor: theme.palette.primary.dark,
+                  borderColor: theme.palette.primary.dark,
+                },
+                '& .fc-today-button': {
+                  backgroundColor: theme.palette.secondary.main,
+                  borderColor: theme.palette.secondary.main,
+                  '&:hover': {
+                    backgroundColor: theme.palette.secondary.dark,
+                    borderColor: theme.palette.secondary.dark,
+                  },
+                },
+                '& .fc-day-today': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                },
+                '& .fc-daygrid-day': {
+                  minHeight: '60px !important',
+                },
+                '& .fc-daygrid-day-frame': {
+                  minHeight: '60px !important',
+                },
+                '& .fc-col-header-cell': {
+                  padding: theme.spacing(0.5),
+                  fontSize: '0.875rem',
+                },
+                '& .fc-daygrid-day-number': {
+                  padding: theme.spacing(0.5),
+                  fontSize: '0.875rem',
+                },
+                '& .fc-event': {
+                  fontSize: '0.75rem',
+                  padding: '2px 4px',
+                  marginBottom: '2px',
+                },
+                '& .fc-event-title': {
+                  fontSize: '0.75rem',
+                },
+              }}>
+                <FullCalendar
+                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                  initialView="dayGridMonth"
+                  headerToolbar={{
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                  }}
+                  events={calendarEvents}
+                  eventClick={(info) => {
+                    const courseId = info.event.extendedProps.courseId;
+                    if (courseId) {
+                      navigate(`/courses/${courseId}`);
+                    }
+                  }}
+                  eventTimeFormat={{
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  }}
+                  slotMinTime="09:00:00"
+                  slotMaxTime="21:00:00"
+                  height={450}
+                  weekends={true}
+                  editable={false}
+                  selectable={false}
+                  dayMaxEvents={2}
+                  moreLinkClick="popover"
+                  aspectRatio={1.8}
+                />
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
     </Box>

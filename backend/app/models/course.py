@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Date, Boolean, ForeignKey, UniqueConstraint, Numeric, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Date, Boolean, ForeignKey, UniqueConstraint, Numeric, Enum, JSON
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 from datetime import datetime, date
@@ -33,6 +33,7 @@ class Course(Base):
     status = Column(Enum(CourseStatus, values_callable=lambda x: [e.value for e in x]), nullable=False, default=CourseStatus.DRAFT, index=True)  # draft, ongoing, completed
     food_cost = Column(Numeric(10, 2), nullable=False, default=0.0)
     other_cost = Column(Numeric(10, 2), nullable=False, default=0.0)
+    class_schedule = Column(JSON, nullable=True)  # Array of {day: str, start_time: str, end_time: str} e.g., [{"day": "Tuesday", "start_time": "14:00", "end_time": "17:00"}]
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

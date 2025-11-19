@@ -33,8 +33,8 @@ function App() {
           <Route path="/" element={<PrivateRoute><Layout><Navigate to="/dashboard" replace /></Layout></PrivateRoute>} />
           <Route path="/dashboard" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
           <Route path="/courses" element={<PrivateRoute><Layout><Navigate to="/courses/ongoing" replace /></Layout></PrivateRoute>} />
-          <Route path="/courses/ongoing" element={<PrivateRoute><Layout><Courses status="ongoing" /></Layout></PrivateRoute>} />
           <Route path="/courses/planning" element={<PrivateRoute><Layout><Courses status="planning" /></Layout></PrivateRoute>} />
+          <Route path="/courses/ongoing" element={<PrivateRoute><Layout><Courses status="ongoing" /></Layout></PrivateRoute>} />
           <Route path="/courses/completed" element={<PrivateRoute><Layout><Courses status="completed" /></Layout></PrivateRoute>} />
           <Route path="/courses/:courseId" element={<PrivateRoute><Layout><CourseDetail /></Layout></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><Layout><Users /></Layout></PrivateRoute>} />

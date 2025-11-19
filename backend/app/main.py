@@ -3,14 +3,59 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from contextlib import asynccontextmanager
 import traceback
 from app.core.config import settings
 from app.api import api_router
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Global scheduler instance
+scheduler = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan - startup and shutdown."""
+    # Startup
+    global scheduler
+    if settings.SMTP_ENABLED and settings.ADMIN_EMAIL:
+        try:
+            from app.services.reminder_service import ReminderService
+            
+            # Create and start scheduler
+            scheduler = BackgroundScheduler()
+            
+            # Schedule reminder check to run every minute
+            scheduler.add_job(
+                ReminderService.check_and_send_reminders,
+                trigger=IntervalTrigger(minutes=1),
+                id='class_reminder_check',
+                name='Check and send class reminders',
+                replace_existing=True
+            )
+            
+            scheduler.start()
+            logger.info("Scheduler started - class reminders will be checked every minute")
+        except Exception as e:
+            logger.error(f"Failed to start scheduler: {str(e)}")
+    else:
+        logger.info("Scheduler not started - email service not enabled or ADMIN_EMAIL not configured")
+    
+    yield
+    
+    # Shutdown
+    if scheduler and scheduler.running:
+        scheduler.shutdown()
+        logger.info("Scheduler stopped")
 
 app = FastAPI(
     title="Physical Course Enrollment Management System",
     description="Automated enrollment management with eligibility checks and instructor approvals",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware - restrict to specific origins and methods

@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = ""
     ADMIN_PASSWORD: str = ""
     
+    # Email Configuration (for reminders)
+    SMTP_ENABLED: bool = False
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_USE_TLS: bool = True
+    REMINDER_MINUTES_BEFORE: int = 30  # Send reminder 30 minutes before class
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
